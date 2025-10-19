@@ -1,12 +1,12 @@
 package repository
 
 import (
-	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func TestAccount_Struct(t *testing.T) {
 		ID:        id,
 		ClientID:  clientID,
 		Name:      "Test Account",
-		CreatedAt: sql.NullTime{Time: now, Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
 	assert.Equal(t, id, account.ID)
@@ -44,7 +44,7 @@ func TestAccount_NullCreatedAt(t *testing.T) {
 		ID:        uuid.New(),
 		ClientID:  uuid.New(),
 		Name:      "Account",
-		CreatedAt: sql.NullTime{Valid: false},
+		CreatedAt: pgtype.Timestamptz{Valid: false},
 	}
 
 	assert.False(t, account.CreatedAt.Valid)
@@ -59,7 +59,7 @@ func TestAccount_JSONSerialization(t *testing.T) {
 		ID:        id,
 		ClientID:  clientID,
 		Name:      "Test Account",
-		CreatedAt: sql.NullTime{Time: now, Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
 	jsonData, err := json.Marshal(account)
@@ -69,7 +69,7 @@ func TestAccount_JSONSerialization(t *testing.T) {
 	var decoded Account
 	err = json.Unmarshal(jsonData, &decoded)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, account.ID, decoded.ID)
 	assert.Equal(t, account.ClientID, decoded.ClientID)
 	assert.Equal(t, account.Name, decoded.Name)
@@ -80,7 +80,7 @@ func TestAccount_EmptyName(t *testing.T) {
 		ID:        uuid.New(),
 		ClientID:  uuid.New(),
 		Name:      "",
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Equal(t, "", account.Name)
@@ -92,7 +92,7 @@ func TestAccount_LongName(t *testing.T) {
 		ID:        uuid.New(),
 		ClientID:  uuid.New(),
 		Name:      longName,
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Equal(t, longName, account.Name)
@@ -115,7 +115,7 @@ func TestAccount_SpecialCharactersInName(t *testing.T) {
 			ID:        uuid.New(),
 			ClientID:  uuid.New(),
 			Name:      name,
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		}
 
 		assert.Equal(t, name, account.Name)
@@ -130,15 +130,15 @@ func TestClient_Struct(t *testing.T) {
 		ID:        id,
 		Name:      "Test Client",
 		ApiKey:    "mock-api-key",
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Time: now, Valid: true},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
 	assert.Equal(t, id, client.ID)
 	assert.Equal(t, "Test Client", client.Name)
 	assert.Equal(t, "mock-api-key", client.ApiKey)
-	assert.True(t, client.IsActive.Valid)
-	assert.True(t, client.IsActive.Bool)
+	assert.NotNil(t, client.IsActive)
+	assert.True(t, *client.IsActive)
 	assert.True(t, client.CreatedAt.Valid)
 	assert.Equal(t, now, client.CreatedAt.Time)
 }
@@ -149,7 +149,7 @@ func TestClient_ZeroValues(t *testing.T) {
 	assert.Equal(t, uuid.Nil, client.ID)
 	assert.Equal(t, "", client.Name)
 	assert.Equal(t, "", client.ApiKey)
-	assert.False(t, client.IsActive.Valid)
+	assert.Nil(t, client.IsActive)
 	assert.False(t, client.CreatedAt.Valid)
 }
 
@@ -158,12 +158,12 @@ func TestClient_InactiveClient(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "Inactive Client",
 		ApiKey:    "inactive-key",
-		IsActive:  sql.NullBool{Bool: false, Valid: true},
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		IsActive:  boolPtr(false),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	assert.True(t, client.IsActive.Valid)
-	assert.False(t, client.IsActive.Bool)
+	assert.NotNil(t, client.IsActive)
+	assert.False(t, *client.IsActive)
 }
 
 func TestClient_NullIsActive(t *testing.T) {
@@ -171,11 +171,11 @@ func TestClient_NullIsActive(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "Client",
 		ApiKey:    "key",
-		IsActive:  sql.NullBool{Valid: false},
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		IsActive:  nil,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	assert.False(t, client.IsActive.Valid)
+	assert.Nil(t, client.IsActive)
 }
 
 func TestClient_NullCreatedAt(t *testing.T) {
@@ -183,8 +183,8 @@ func TestClient_NullCreatedAt(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "Client",
 		ApiKey:    "key",
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Valid: false},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Valid: false},
 	}
 
 	assert.False(t, client.CreatedAt.Valid)
@@ -198,8 +198,8 @@ func TestClient_JSONSerialization(t *testing.T) {
 		ID:        id,
 		Name:      "Test Client",
 		ApiKey:    "test-key",
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Time: now, Valid: true},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
 	jsonData, err := json.Marshal(client)
@@ -209,7 +209,7 @@ func TestClient_JSONSerialization(t *testing.T) {
 	var decoded Client
 	err = json.Unmarshal(jsonData, &decoded)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, client.ID, decoded.ID)
 	assert.Equal(t, client.Name, decoded.Name)
 	assert.Equal(t, client.ApiKey, decoded.ApiKey)
@@ -220,8 +220,8 @@ func TestClient_EmptyName(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "",
 		ApiKey:    "key",
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Equal(t, "", client.Name)
@@ -232,8 +232,8 @@ func TestClient_EmptyApiKey(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "Client",
 		ApiKey:    "",
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Equal(t, "", client.ApiKey)
@@ -245,8 +245,8 @@ func TestClient_LongApiKey(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "Client",
 		ApiKey:    longKey,
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Equal(t, longKey, client.ApiKey)
@@ -268,8 +268,8 @@ func TestClient_SpecialCharactersInApiKey(t *testing.T) {
 			ID:        uuid.New(),
 			Name:      "Client",
 			ApiKey:    key,
-			IsActive:  sql.NullBool{Bool: true, Valid: true},
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			IsActive:  boolPtr(true),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		}
 
 		assert.Equal(t, key, client.ApiKey)
@@ -291,8 +291,8 @@ func TestClient_SpecialCharactersInName(t *testing.T) {
 			ID:        uuid.New(),
 			Name:      name,
 			ApiKey:    "key",
-			IsActive:  sql.NullBool{Bool: true, Valid: true},
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			IsActive:  boolPtr(true),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		}
 
 		assert.Equal(t, name, client.Name)
@@ -305,13 +305,13 @@ func TestAccount_MultipleInstances(t *testing.T) {
 			ID:        uuid.New(),
 			ClientID:  uuid.New(),
 			Name:      "Account 1",
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		{
 			ID:        uuid.New(),
 			ClientID:  uuid.New(),
 			Name:      "Account 2",
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 	}
 
@@ -326,39 +326,39 @@ func TestClient_MultipleInstances(t *testing.T) {
 			ID:        uuid.New(),
 			Name:      "Client 1",
 			ApiKey:    "key1",
-			IsActive:  sql.NullBool{Bool: true, Valid: true},
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			IsActive:  boolPtr(true),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		{
 			ID:        uuid.New(),
 			Name:      "Client 2",
 			ApiKey:    "key2",
-			IsActive:  sql.NullBool{Bool: false, Valid: true},
-			CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+			IsActive:  boolPtr(false),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 	}
 
 	assert.NotEqual(t, clients[0].ID, clients[1].ID)
 	assert.NotEqual(t, clients[0].Name, clients[1].Name)
 	assert.NotEqual(t, clients[0].ApiKey, clients[1].ApiKey)
-	assert.NotEqual(t, clients[0].IsActive.Bool, clients[1].IsActive.Bool)
+	assert.NotEqual(t, *clients[0].IsActive, *clients[1].IsActive)
 }
 
 func TestAccount_SameClientID(t *testing.T) {
 	clientID := uuid.New()
-	
+
 	account1 := Account{
 		ID:        uuid.New(),
 		ClientID:  clientID,
 		Name:      "Account 1",
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
-	
+
 	account2 := Account{
 		ID:        uuid.New(),
 		ClientID:  clientID,
 		Name:      "Account 2",
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Equal(t, account1.ClientID, account2.ClientID)
@@ -375,27 +375,23 @@ func TestUUIDNil(t *testing.T) {
 }
 
 func TestSQLNullTypes(t *testing.T) {
-	// Test sql.NullTime with nil time
-	nullTime := sql.NullTime{Valid: false}
+	// Test pgtype.Timestamptz with nil time
+	nullTime := pgtype.Timestamptz{Valid: false}
 	assert.False(t, nullTime.Valid)
-	
-	// Test sql.NullTime with valid time
+
+	// Test pgtype.Timestamptz with valid time
 	now := time.Now()
-	validTime := sql.NullTime{Time: now, Valid: true}
+	validTime := pgtype.Timestamptz{Time: now, Valid: true}
 	assert.True(t, validTime.Valid)
 	assert.Equal(t, now, validTime.Time)
-	
-	// Test sql.NullBool with false
-	falseBool := sql.NullBool{Bool: false, Valid: true}
-	assert.True(t, falseBool.Valid)
-	assert.False(t, falseBool.Bool)
-	
-	// Test sql.NullBool with true
-	trueBool := sql.NullBool{Bool: true, Valid: true}
-	assert.True(t, trueBool.Valid)
-	assert.True(t, trueBool.Bool)
-	
-	// Test invalid sql.NullBool
-	invalidBool := sql.NullBool{Valid: false}
-	assert.False(t, invalidBool.Valid)
+
+	// Test bool pointer with false
+	falseBool := boolPtr(false)
+	assert.NotNil(t, falseBool)
+	assert.False(t, *falseBool)
+
+	// Test bool pointer with true
+	trueBool := boolPtr(true)
+	assert.NotNil(t, trueBool)
+	assert.True(t, *trueBool)
 }

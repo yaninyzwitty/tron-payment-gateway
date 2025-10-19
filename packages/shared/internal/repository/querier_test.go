@@ -92,7 +92,7 @@ func TestMockQuerier_CreateClient(t *testing.T) {
 func TestMockQuerier_GetAccountByIDAndClientID(t *testing.T) {
 	mockQuerier := new(MockQuerier)
 	ctx := context.Background()
-	
+
 	id := uuid.New()
 	clientID := uuid.New()
 	params := GetAccountByIDAndClientIDParams{
