@@ -2,13 +2,13 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func TestCreateClientParams_JSONSerialization(t *testing.T) {
 	var decoded CreateClientParams
 	err = json.Unmarshal(jsonData, &decoded)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, params.Name, decoded.Name)
 	assert.Equal(t, params.ApiKey, decoded.ApiKey)
 }
@@ -76,7 +76,7 @@ func TestCreateClientParams_SpecialCharacters(t *testing.T) {
 func TestQueries_CreateClient_Success(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateClientParams{
 		Name:   "Test Client",
@@ -95,7 +95,7 @@ func TestQueries_CreateClient_Success(t *testing.T) {
 func TestQueries_CreateClient_Error(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateClientParams{
 		Name:   "Test Client",
@@ -115,10 +115,10 @@ func TestQueries_CreateClient_Error(t *testing.T) {
 func TestQueries_CreateClient_ContextCancellation(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	
+
 	params := CreateClientParams{
 		Name:   "Test Client",
 		ApiKey: "test-api-key",
@@ -136,7 +136,7 @@ func TestQueries_CreateClient_ContextCancellation(t *testing.T) {
 func TestQueries_CreateClient_EmptyName(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateClientParams{
 		Name:   "",
@@ -155,7 +155,7 @@ func TestQueries_CreateClient_EmptyName(t *testing.T) {
 func TestQueries_CreateClient_EmptyApiKey(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateClientParams{
 		Name:   "Test Client",
@@ -174,7 +174,7 @@ func TestQueries_CreateClient_EmptyApiKey(t *testing.T) {
 func TestQueries_CreateClient_LongApiKey(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	longKey := string(make([]byte, 1000))
 	params := CreateClientParams{
@@ -194,15 +194,9 @@ func TestQueries_CreateClient_LongApiKey(t *testing.T) {
 func TestQueries_CreateClient_WithTransaction(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
-	mockTx := &sql.Tx{}
+
+	mockTx := &MockTx{}
 	txQueries := queries.WithTx(mockTx)
-	
-	ctx := context.Background()
-	params := CreateClientParams{
-		Name:   "Test Client",
-		ApiKey: "test-api-key",
-	}
 
 	assert.NotNil(t, txQueries)
 	assert.NotEqual(t, queries.db, txQueries.db)
@@ -211,7 +205,7 @@ func TestQueries_CreateClient_WithTransaction(t *testing.T) {
 func TestQueries_GetClientByAPIKey_Success(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	apiKey := "test-api-key"
 
@@ -219,14 +213,14 @@ func TestQueries_GetClientByAPIKey_Success(t *testing.T) {
 	mockDB.On("QueryRowContext", ctx, getClientByAPIKey, mock.Anything).Return(mockRow)
 
 	_, _ = queries.GetClientByAPIKey(ctx, apiKey)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
 func TestQueries_GetClientByAPIKey_EmptyKey(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	apiKey := ""
 
@@ -234,14 +228,14 @@ func TestQueries_GetClientByAPIKey_EmptyKey(t *testing.T) {
 	mockDB.On("QueryRowContext", ctx, getClientByAPIKey, mock.Anything).Return(mockRow)
 
 	_, _ = queries.GetClientByAPIKey(ctx, apiKey)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
 func TestQueries_GetClientByAPIKey_SpecialCharacters(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	apiKey := "key-with-special-chars!@#$%"
 
@@ -249,14 +243,14 @@ func TestQueries_GetClientByAPIKey_SpecialCharacters(t *testing.T) {
 	mockDB.On("QueryRowContext", ctx, getClientByAPIKey, mock.Anything).Return(mockRow)
 
 	_, _ = queries.GetClientByAPIKey(ctx, apiKey)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
 func TestQueries_GetClientByID_Success(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	id := uuid.New()
 
@@ -264,14 +258,14 @@ func TestQueries_GetClientByID_Success(t *testing.T) {
 	mockDB.On("QueryRowContext", ctx, getClientByID, mock.Anything).Return(mockRow)
 
 	_, _ = queries.GetClientByID(ctx, id)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
 func TestQueries_GetClientByID_NilUUID(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	id := uuid.Nil
 
@@ -279,24 +273,24 @@ func TestQueries_GetClientByID_NilUUID(t *testing.T) {
 	mockDB.On("QueryRowContext", ctx, getClientByID, mock.Anything).Return(mockRow)
 
 	_, _ = queries.GetClientByID(ctx, id)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
 func TestQueries_GetClientByID_ContextCancellation(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	
+
 	id := uuid.New()
 
 	mockRow := new(MockRow)
 	mockDB.On("QueryRowContext", ctx, getClientByID, mock.Anything).Return(mockRow)
 
 	_, _ = queries.GetClientByID(ctx, id)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
@@ -320,13 +314,13 @@ func TestClient_JSONTags(t *testing.T) {
 		ID:        uuid.New(),
 		Name:      "Test",
 		ApiKey:    "key",
-		IsActive:  sql.NullBool{Bool: true, Valid: true},
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		IsActive:  boolPtr(true),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	jsonData, err := json.Marshal(client)
 	require.NoError(t, err)
-	
+
 	// Verify JSON uses snake_case as per json tags
 	assert.Contains(t, string(jsonData), "api_key")
 	assert.Contains(t, string(jsonData), "is_active")

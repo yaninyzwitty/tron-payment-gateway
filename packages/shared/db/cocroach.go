@@ -10,8 +10,8 @@ import (
 	"github.com/yaninyzwitty/tron-payment-gateway/packages/shared/config"
 )
 
-func DbConnect(ctx context.Context, cfg *config.Config, cocroachDBPass string) (*pgxpool.Pool, error) {
-	userInfo := url.UserPassword(cfg.DatabaseConfig.User, cocroachDBPass)
+func DbConnect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+	userInfo := url.UserPassword(cfg.DatabaseConfig.User, cfg.DatabaseConfig.Password)
 
 	dbURL := url.URL{
 		Scheme:   "postgres",

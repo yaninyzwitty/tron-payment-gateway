@@ -2,11 +2,9 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +37,7 @@ func TestCreateAccountParams_JSONSerialization(t *testing.T) {
 	var decoded CreateAccountParams
 	err = json.Unmarshal(jsonData, &decoded)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, params.ClientID, decoded.ClientID)
 	assert.Equal(t, params.Name, decoded.Name)
 }
@@ -74,7 +72,7 @@ func TestCreateAccountParams_SpecialCharacters(t *testing.T) {
 func TestGetAccountByIDAndClientIDParams_Struct(t *testing.T) {
 	id := uuid.New()
 	clientID := uuid.New()
-	
+
 	params := GetAccountByIDAndClientIDParams{
 		ID:       id,
 		ClientID: clientID,
@@ -87,7 +85,7 @@ func TestGetAccountByIDAndClientIDParams_Struct(t *testing.T) {
 func TestGetAccountByIDAndClientIDParams_JSONSerialization(t *testing.T) {
 	id := uuid.New()
 	clientID := uuid.New()
-	
+
 	params := GetAccountByIDAndClientIDParams{
 		ID:       id,
 		ClientID: clientID,
@@ -100,7 +98,7 @@ func TestGetAccountByIDAndClientIDParams_JSONSerialization(t *testing.T) {
 	var decoded GetAccountByIDAndClientIDParams
 	err = json.Unmarshal(jsonData, &decoded)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, params.ID, decoded.ID)
 	assert.Equal(t, params.ClientID, decoded.ClientID)
 }
@@ -118,7 +116,7 @@ func TestGetAccountByIDAndClientIDParams_NilUUIDs(t *testing.T) {
 func TestQueries_CreateAccount_Success(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateAccountParams{
 		ClientID: uuid.New(),
@@ -137,7 +135,7 @@ func TestQueries_CreateAccount_Success(t *testing.T) {
 func TestQueries_CreateAccount_Error(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateAccountParams{
 		ClientID: uuid.New(),
@@ -157,10 +155,10 @@ func TestQueries_CreateAccount_Error(t *testing.T) {
 func TestQueries_CreateAccount_ContextCancellation(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	
+
 	params := CreateAccountParams{
 		ClientID: uuid.New(),
 		Name:     "Test Account",
@@ -177,7 +175,7 @@ func TestQueries_CreateAccount_ContextCancellation(t *testing.T) {
 func TestQueries_CreateAccount_EmptyName(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	params := CreateAccountParams{
 		ClientID: uuid.New(),
@@ -196,15 +194,9 @@ func TestQueries_CreateAccount_EmptyName(t *testing.T) {
 func TestQueries_CreateAccount_WithTransaction(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
-	mockTx := &sql.Tx{}
+
+	mockTx := &MockTx{}
 	txQueries := queries.WithTx(mockTx)
-	
-	ctx := context.Background()
-	params := CreateAccountParams{
-		ClientID: uuid.New(),
-		Name:     "Test Account",
-	}
 
 	// The transaction should be used, not the original DB
 	assert.NotNil(t, txQueries)
@@ -214,37 +206,34 @@ func TestQueries_CreateAccount_WithTransaction(t *testing.T) {
 func TestQueries_GetAccountByIDAndClientID_Success(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	id := uuid.New()
 	clientID := uuid.New()
-	
+
 	params := GetAccountByIDAndClientIDParams{
 		ID:       id,
 		ClientID: clientID,
 	}
 
-	expectedAccount := Account{
-		ID:        id,
-		ClientID:  clientID,
-		Name:      "Test Account",
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
-	}
-
 	mockRow := new(MockRow)
 	mockDB.On("QueryRowContext", ctx, getAccountByIDAndClientID, mock.Anything).Return(mockRow)
+
+	// Verify params structure
+	assert.Equal(t, id, params.ID)
+	assert.Equal(t, clientID, params.ClientID)
 
 	// Note: We can't fully test Scan behavior without a real database or more complex mocking
 	// This tests the method call structure
 	_, _ = queries.GetAccountByIDAndClientID(ctx, params)
-	
+
 	mockDB.AssertExpectations(t)
 }
 
 func TestQueries_GetAccountsByClientID_EmptyResult(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	clientID := uuid.New()
 
@@ -264,7 +253,7 @@ func TestQueries_GetAccountsByClientID_EmptyResult(t *testing.T) {
 func TestQueries_GetAccountsByClientID_Error(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	clientID := uuid.New()
 
@@ -282,7 +271,7 @@ func TestQueries_GetAccountsByClientID_Error(t *testing.T) {
 func TestQueries_GetAccountsByClientID_NilClientID(t *testing.T) {
 	mockDB := new(MockDBTX)
 	queries := New(mockDB)
-	
+
 	ctx := context.Background()
 	clientID := uuid.Nil
 

@@ -14,8 +14,8 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	User string `yaml:"user"`
-	// Password       string `yaml:"password"` TODO-use environmental variable for password
+	User           string `yaml:"user"`
+	Password       string `yaml:"password"`
 	Host           string `yaml:"host"`
 	Port           int    `yaml:"port"`
 	Database       string `yaml:"database"`
