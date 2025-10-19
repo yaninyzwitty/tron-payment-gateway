@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package payment;
+
+service PaymentService {
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse);
+  rpc GetPaymentStatus(GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+}
+
+message CreatePaymentRequest {
+  string client_id = 1;
+  string account_id = 2;
+  double amount = 3;
+}
+
+message CreatePaymentResponse {
+  string payment_id = 1;
+  string wallet_address = 2;
+  string expires_at = 3;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  string status = 1;
+  string tx_hash = 2;
+}
