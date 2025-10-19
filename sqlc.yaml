@@ -1,0 +1,14 @@
+version: "2"
+sql:
+  - engine: "postgresql"  
+    schema: "packages/shared/db/migrations"   
+    queries: "packages/shared/db/queries"   
+    gen:
+      go:
+        package: "repository"         # 
+        out: "packages/shared/internal/repository"    
+        emit_json_tags: true          #  Useful when mapping to structs
+        emit_interface: true          #  Generates repository interfaces automatically
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"  #  Strong typing for UUIDs
