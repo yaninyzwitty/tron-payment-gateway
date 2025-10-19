@@ -16,12 +16,12 @@ INSERT INTO clients (name, api_key) VALUES ($1, $2)
 `
 
 type CreateClientParams struct {
-	Name   string `json:"name"`
-	ApiKey string `json:"api_key"`
+	Name   string `db:"name" json:"name"`
+	ApiKey string `db:"api_key" json:"api_key"`
 }
 
 func (q *Queries) CreateClient(ctx context.Context, arg CreateClientParams) error {
-	_, err := q.db.ExecContext(ctx, createClient, arg.Name, arg.ApiKey)
+	_, err := q.db.Exec(ctx, createClient, arg.Name, arg.ApiKey)
 	return err
 }
 
@@ -33,7 +33,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetClientByAPIKey(ctx context.Context, apiKey string) (Client, error) {
-	row := q.db.QueryRowContext(ctx, getClientByAPIKey, apiKey)
+	row := q.db.QueryRow(ctx, getClientByAPIKey, apiKey)
 	var i Client
 	err := row.Scan(
 		&i.ID,
@@ -53,7 +53,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetClientByID(ctx context.Context, id uuid.UUID) (Client, error) {
-	row := q.db.QueryRowContext(ctx, getClientByID, id)
+	row := q.db.QueryRow(ctx, getClientByID, id)
 	var i Client
 	err := row.Scan(
 		&i.ID,

@@ -14,9 +14,10 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	User           string `yaml:"user"`
-	Password       string `yaml:"password"`
+	User string `yaml:"user"`
+	// Password       string `yaml:"password"` TODO-use environmental variable for password
 	Host           string `yaml:"host"`
+	Port           int    `yaml:"port"`
 	Database       string `yaml:"database"`
 	MaxConnections int    `yaml:"maxConnections"`
 }
@@ -24,11 +25,11 @@ type DatabaseConfig struct {
 func (c *Config) LoadConfig(path string) error {
 	f, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read config %v", err)
+		return fmt.Errorf("failed to read config %w", err)
 	}
 
 	if err := yaml.Unmarshal(f, c); err != nil {
-		return fmt.Errorf("failed to parse config %v", err)
+		return fmt.Errorf("failed to parse config %w", err)
 	}
 
 	return nil

@@ -16,12 +16,12 @@ INSERT INTO accounts (client_id, name) VALUES ($1, $2)
 `
 
 type CreateAccountParams struct {
-	ClientID uuid.UUID `json:"client_id"`
-	Name     string    `json:"name"`
+	ClientID uuid.UUID `db:"client_id" json:"client_id"`
+	Name     string    `db:"name" json:"name"`
 }
 
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) error {
-	_, err := q.db.ExecContext(ctx, createAccount, arg.ClientID, arg.Name)
+	_, err := q.db.Exec(ctx, createAccount, arg.ClientID, arg.Name)
 	return err
 }
 
@@ -33,12 +33,12 @@ LIMIT 1
 `
 
 type GetAccountByIDAndClientIDParams struct {
-	ID       uuid.UUID `json:"id"`
-	ClientID uuid.UUID `json:"client_id"`
+	ID       uuid.UUID `db:"id" json:"id"`
+	ClientID uuid.UUID `db:"client_id" json:"client_id"`
 }
 
 func (q *Queries) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (Account, error) {
-	row := q.db.QueryRowContext(ctx, getAccountByIDAndClientID, arg.ID, arg.ClientID)
+	row := q.db.QueryRow(ctx, getAccountByIDAndClientID, arg.ID, arg.ClientID)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -56,7 +56,7 @@ WHERE client_id = $1
 `
 
 func (q *Queries) GetAccountsByClientID(ctx context.Context, clientID uuid.UUID) ([]Account, error) {
-	rows, err := q.db.QueryContext(ctx, getAccountsByClientID, clientID)
+	rows, err := q.db.Query(ctx, getAccountsByClientID, clientID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +73,6 @@ func (q *Queries) GetAccountsByClientID(ctx context.Context, clientID uuid.UUID)
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

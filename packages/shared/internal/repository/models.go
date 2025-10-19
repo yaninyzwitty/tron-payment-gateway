@@ -5,22 +5,21 @@
 package repository
 
 import (
-	"database/sql"
-
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Account struct {
-	ID        uuid.UUID    `json:"id"`
-	ClientID  uuid.UUID    `json:"client_id"`
-	Name      string       `json:"name"`
-	CreatedAt sql.NullTime `json:"created_at"`
+	ID        uuid.UUID          `db:"id" json:"id"`
+	ClientID  uuid.UUID          `db:"client_id" json:"client_id"`
+	Name      string             `db:"name" json:"name"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Client struct {
-	ID        uuid.UUID    `json:"id"`
-	Name      string       `json:"name"`
-	ApiKey    string       `json:"api_key"`
-	IsActive  sql.NullBool `json:"is_active"`
-	CreatedAt sql.NullTime `json:"created_at"`
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Name      string             `db:"name" json:"name"`
+	ApiKey    string             `db:"api_key" json:"api_key"`
+	IsActive  *bool              `db:"is_active" json:"is_active"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
