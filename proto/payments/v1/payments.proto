@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+option go_package = "github.com/yaninyzwitty/tron-payment-gateway/gen/payments/v1;paymentsv1";
 package payments.v1;
 
 service PaymentService {
