@@ -43,4 +43,5 @@ func DbConnect(ctx context.Context, cfg *config.Config, cocroachDBPass string) (
 	}
 
 	return dbpool, nil
+	// see if it works
 }
