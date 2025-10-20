@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option go_package = "github.com/yaninyzwitty/tron-payment-gateway/gen/clients/v1;clientsv1";
+package clients.v1;
+import "google/protobuf/timestamp.proto";
+
+
+service ClientService {
+    rpc CreateClient (CreateClientRequest) returns (CreateClientResponse);
+}
+
+message ClientResponse {
+    string id = 1;
+    string name = 2;
+    string api_key = 3;
+    bool is_active = 4;
+    google.protobuf.Timestamp expires_at = 5;
+}
+
+
+message CreateClientRequest {
+    string name = 1;
+    string api_key = 2;
+
+
+}
+
+
+message CreateClientResponse {
+    ClientResponse response = 1;
+
+    
+}

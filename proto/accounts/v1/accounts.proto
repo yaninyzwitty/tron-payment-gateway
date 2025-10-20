@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package accounts.v1;
+
+option go_package = "github.com/yaninyzwitty/tron-payment-gateway/gen/accounts/v1;accountsv1";
+
+import "google/protobuf/timestamp.proto";
+
+service AccountService {
+    rpc CreateAccount (CreateAccountRequest) returns (CreateAccountResponse);
+}
+
+message Account {
+    string id = 1;                       
+    string client_id = 2;                  
+    string name = 3;
+    uint32 address_index = 4;               
+    google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateAccountRequest {
+    string client_id = 1;                  
+    string name = 2;
+    uint32 address_index = 3;               
+}
+
+message CreateAccountResponse {
+    Account account = 1;                    
+}

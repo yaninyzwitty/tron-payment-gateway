@@ -97,3 +97,4 @@ func (m *MockTx) Conn() *pgx.Conn {
 func boolPtr(b bool) *bool {
 	return &b
 }
+$ r .sed-tmp

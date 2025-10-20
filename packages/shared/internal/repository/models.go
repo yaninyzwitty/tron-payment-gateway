@@ -10,10 +10,11 @@ import (
 )
 
 type Account struct {
-	ID        uuid.UUID          `db:"id" json:"id"`
-	ClientID  uuid.UUID          `db:"client_id" json:"client_id"`
-	Name      string             `db:"name" json:"name"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+	ClientID     uuid.UUID          `db:"client_id" json:"client_id"`
+	Name         string             `db:"name" json:"name"`
+	AddressIndex *int32             `db:"address_index" json:"address_index"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Client struct {
@@ -22,4 +23,34 @@ type Client struct {
 	ApiKey    string             `db:"api_key" json:"api_key"`
 	IsActive  *bool              `db:"is_active" json:"is_active"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Log struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	PaymentID pgtype.UUID        `db:"payment_id" json:"payment_id"`
+	EventType string             `db:"event_type" json:"event_type"`
+	Message   *string            `db:"message" json:"message"`
+	RawData   []byte             `db:"raw_data" json:"raw_data"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Payment struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	ClientID     uuid.UUID          `db:"client_id" json:"client_id"`
+	AccountID    uuid.UUID          `db:"account_id" json:"account_id"`
+	Amount       pgtype.Numeric     `db:"amount" json:"amount"`
+	UniqueWallet string             `db:"unique_wallet" json:"unique_wallet"`
+	Status       string             `db:"status" json:"status"`
+	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ConfirmedAt  pgtype.Timestamptz `db:"confirmed_at" json:"confirmed_at"`
+	AttemptCount *int32             `db:"attempt_count" json:"attempt_count"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type PaymentAttempt struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	PaymentID       uuid.UUID          `db:"payment_id" json:"payment_id"`
+	AttemptNumber   int32              `db:"attempt_number" json:"attempt_number"`
+	GeneratedWallet string             `db:"generated_wallet" json:"generated_wallet"`
+	GeneratedAt     pgtype.Timestamptz `db:"generated_at" json:"generated_at"`
 }

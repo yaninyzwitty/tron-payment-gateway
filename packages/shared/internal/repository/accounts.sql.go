@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createAccount = `-- name: CreateAccount :exec
@@ -37,9 +38,16 @@ type GetAccountByIDAndClientIDParams struct {
 	ClientID uuid.UUID `db:"client_id" json:"client_id"`
 }
 
-func (q *Queries) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (Account, error) {
+type GetAccountByIDAndClientIDRow struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	ClientID  uuid.UUID          `db:"client_id" json:"client_id"`
+	Name      string             `db:"name" json:"name"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (GetAccountByIDAndClientIDRow, error) {
 	row := q.db.QueryRow(ctx, getAccountByIDAndClientID, arg.ID, arg.ClientID)
-	var i Account
+	var i GetAccountByIDAndClientIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.ClientID,
@@ -55,15 +63,22 @@ FROM accounts
 WHERE client_id = $1
 `
 
-func (q *Queries) GetAccountsByClientID(ctx context.Context, clientID uuid.UUID) ([]Account, error) {
+type GetAccountsByClientIDRow struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	ClientID  uuid.UUID          `db:"client_id" json:"client_id"`
+	Name      string             `db:"name" json:"name"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetAccountsByClientID(ctx context.Context, clientID uuid.UUID) ([]GetAccountsByClientIDRow, error) {
 	rows, err := q.db.Query(ctx, getAccountsByClientID, clientID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Account
+	var items []GetAccountsByClientIDRow
 	for rows.Next() {
-		var i Account
+		var i GetAccountsByClientIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ClientID,
