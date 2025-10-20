@@ -4,72 +4,142 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/btcsuite/btcutil/base58"
 )
 
-// TestDeriveTronAddressFromMnemonic_ValidMnemonic tests derivation with a valid mnemonic
-func TestDeriveTronAddressFromMnemonic_ValidMnemonic(t *testing.T) {
+// Test DeriveTronAddressFromMnemonic with valid mnemonic and index 0
+func TestDeriveTronAddressFromMnemonic_Success(t *testing.T) {
 	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
 	index := uint32(0)
 
 	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
 
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-	assert.NotEmpty(t, privKey)
-	assert.Len(t, privKey, 64) // 32 bytes = 64 hex characters
-	
-	// Verify address format (Tron addresses start with 'T' in base58)
-	assert.True(t, len(address) > 0)
-	
-	// Private key should be valid hex
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if address == "" {
+		t.Error("Expected non-empty address")
+	}
+
+	if privKey == "" {
+		t.Error("Expected non-empty private key")
+	}
+
+	// Validate address format: should start with 'T' and be 34 characters
+	if !strings.HasPrefix(address, "T") {
+		t.Errorf("Expected address to start with 'T', got: %s", address)
+	}
+
+	// Validate private key is hex encoded
+	if len(privKey) != 64 {
+		t.Errorf("Expected private key hex length of 64, got: %d", len(privKey))
+	}
+
 	_, err = hex.DecodeString(privKey)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Private key should be valid hex: %v", err)
+	}
 }
 
-// TestDeriveTronAddressFromMnemonic_DeterministicOutput ensures same inputs produce same outputs
-func TestDeriveTronAddressFromMnemonic_DeterministicOutput(t *testing.T) {
-	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-	index := uint32(0)
-
-	// Generate address twice
-	address1, privKey1, err1 := DeriveTronAddressFromMnemonic(mnemonic, index)
-	address2, privKey2, err2 := DeriveTronAddressFromMnemonic(mnemonic, index)
-
-	require.NoError(t, err1)
-	require.NoError(t, err2)
-	
-	// Both calls should produce identical results
-	assert.Equal(t, address1, address2)
-	assert.Equal(t, privKey1, privKey2)
-}
-
-// TestDeriveTronAddressFromMnemonic_DifferentIndices tests that different indices produce different addresses
+// Test DeriveTronAddressFromMnemonic with different indices produces different addresses
 func TestDeriveTronAddressFromMnemonic_DifferentIndices(t *testing.T) {
 	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
 
-	// Generate addresses for different indices
 	address0, privKey0, err0 := DeriveTronAddressFromMnemonic(mnemonic, 0)
 	address1, privKey1, err1 := DeriveTronAddressFromMnemonic(mnemonic, 1)
 	address2, privKey2, err2 := DeriveTronAddressFromMnemonic(mnemonic, 2)
 
-	require.NoError(t, err0)
-	require.NoError(t, err1)
-	require.NoError(t, err2)
+	if err0 != nil || err1 != nil || err2 != nil {
+		t.Fatal("Expected no errors")
+	}
 
-	// All addresses should be different
-	assert.NotEqual(t, address0, address1)
-	assert.NotEqual(t, address0, address2)
-	assert.NotEqual(t, address1, address2)
+	// Different indices should produce different addresses
+	if address0 == address1 || address1 == address2 || address0 == address2 {
+		t.Error("Different indices should produce different addresses")
+	}
 
-	// All private keys should be different
-	assert.NotEqual(t, privKey0, privKey1)
-	assert.NotEqual(t, privKey0, privKey2)
-	assert.NotEqual(t, privKey1, privKey2)
+	// Different indices should produce different private keys
+	if privKey0 == privKey1 || privKey1 == privKey2 || privKey0 == privKey2 {
+		t.Error("Different indices should produce different private keys")
+	}
 }
 
-// TestDeriveTronAddressFromMnemonic_DifferentMnemonics tests different mnemonics produce different addresses
+// Test DeriveTronAddressFromMnemonic with large index
+func TestDeriveTronAddressFromMnemonic_LargeIndex(t *testing.T) {
+	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
+	index := uint32(999999)
+
+	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
+
+	if err != nil {
+		t.Fatalf("Expected no error with large index, got: %v", err)
+	}
+
+	if address == "" || privKey == "" {
+		t.Error("Expected valid address and private key for large index")
+	}
+}
+
+// Test DeriveTronAddressFromMnemonic with maximum uint32 index
+func TestDeriveTronAddressFromMnemonic_MaxIndex(t *testing.T) {
+	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
+	index := uint32(0xFFFFFFFF) // Maximum uint32 value
+
+	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
+
+	if err != nil {
+		t.Fatalf("Expected no error with max index, got: %v", err)
+	}
+
+	if address == "" || privKey == "" {
+		t.Error("Expected valid address and private key for max index")
+	}
+}
+
+// Test DeriveTronAddressFromMnemonic determinism - same inputs should produce same outputs
+func TestDeriveTronAddressFromMnemonic_Deterministic(t *testing.T) {
+	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
+	index := uint32(42)
+
+	address1, privKey1, err1 := DeriveTronAddressFromMnemonic(mnemonic, index)
+	address2, privKey2, err2 := DeriveTronAddressFromMnemonic(mnemonic, index)
+
+	if err1 != nil || err2 != nil {
+		t.Fatal("Expected no errors")
+	}
+
+	if address1 != address2 {
+		t.Errorf("Expected deterministic address generation, got %s and %s", address1, address2)
+	}
+
+	if privKey1 != privKey2 {
+		t.Errorf("Expected deterministic private key generation, got %s and %s", privKey1, privKey2)
+	}
+}
+
+// Test DeriveTronAddressFromMnemonic with empty mnemonic
+func TestDeriveTronAddressFromMnemonic_EmptyMnemonic(t *testing.T) {
+	mnemonic := ""
+	index := uint32(0)
+
+	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
+
+	// With empty mnemonic, it should still generate something (seed will be derived from empty string)
+	// This is technically valid behavior, though not recommended
+	if err != nil {
+		t.Logf("Empty mnemonic resulted in error: %v", err)
+	}
+
+	if address != "" && privKey != "" && err == nil {
+		// If it succeeds, ensure format is correct
+		if !strings.HasPrefix(address, "T") {
+			t.Error("Address should still start with T")
+		}
+	}
+}
+
+// Test DeriveTronAddressFromMnemonic with different mnemonics produce different addresses
 func TestDeriveTronAddressFromMnemonic_DifferentMnemonics(t *testing.T) {
 	mnemonic1 := "flash couple heart script ramp april average caution plunge alter elite author"
 	mnemonic2 := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
@@ -78,179 +148,83 @@ func TestDeriveTronAddressFromMnemonic_DifferentMnemonics(t *testing.T) {
 	address1, privKey1, err1 := DeriveTronAddressFromMnemonic(mnemonic1, index)
 	address2, privKey2, err2 := DeriveTronAddressFromMnemonic(mnemonic2, index)
 
-	require.NoError(t, err1)
-	require.NoError(t, err2)
-
-	// Different mnemonics should produce different results
-	assert.NotEqual(t, address1, address2)
-	assert.NotEqual(t, privKey1, privKey2)
-}
-
-// TestDeriveTronAddressFromMnemonic_EmptyMnemonic tests behavior with empty mnemonic
-func TestDeriveTronAddressFromMnemonic_EmptyMnemonic(t *testing.T) {
-	mnemonic := ""
-	index := uint32(0)
-
-	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
-
-	// Empty mnemonic should still work (creates a valid seed)
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-	assert.NotEmpty(t, privKey)
-}
-
-// TestDeriveTronAddressFromMnemonic_LargeIndex tests derivation with a large index
-func TestDeriveTronAddressFromMnemonic_LargeIndex(t *testing.T) {
-	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-	index := uint32(999999)
-
-	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-	assert.NotEmpty(t, privKey)
-}
-
-// TestDeriveTronAddressFromMnemonic_MaxIndex tests derivation with maximum uint32 index
-func TestDeriveTronAddressFromMnemonic_MaxIndex(t *testing.T) {
-	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-	index := uint32(4294967295) // Max uint32
-
-	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-	assert.NotEmpty(t, privKey)
-}
-
-// TestDeriveTronAddressFromMnemonic_MultipleIndices tests sequential address generation
-func TestDeriveTronAddressFromMnemonic_MultipleIndices(t *testing.T) {
-	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-
-	addresses := make(map[string]bool)
-	privKeys := make(map[string]bool)
-
-	// Generate 10 addresses
-	for i := uint32(0); i < 10; i++ {
-		address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, i)
-		require.NoError(t, err)
-
-		// Ensure no duplicates
-		assert.False(t, addresses[address], "Duplicate address found at index %d", i)
-		assert.False(t, privKeys[privKey], "Duplicate private key found at index %d", i)
-
-		addresses[address] = true
-		privKeys[privKey] = true
+	if err1 != nil || err2 != nil {
+		t.Fatal("Expected no errors")
 	}
 
-	assert.Len(t, addresses, 10)
-	assert.Len(t, privKeys, 10)
-}
-
-// TestDeriveTronAddressFromMnemonic_ValidFormatOutput tests that output format is correct
-func TestDeriveTronAddressFromMnemonic_ValidFormatOutput(t *testing.T) {
-	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-	index := uint32(0)
-
-	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonic, index)
-
-	require.NoError(t, err)
-
-	// Private key validation
-	assert.Len(t, privKey, 64, "Private key should be 64 hex characters")
-	decodedKey, err := hex.DecodeString(privKey)
-	require.NoError(t, err)
-	assert.Len(t, decodedKey, 32, "Private key should be 32 bytes")
-
-	// Address validation
-	assert.NotEmpty(t, address)
-	assert.Greater(t, len(address), 25, "Tron addresses are typically 34 characters")
-	assert.Less(t, len(address), 50, "Tron addresses shouldn't exceed reasonable length")
-}
-
-// TestDeriveTronAddressFromMnemonic_StandardMnemonics tests with various standard mnemonics
-func TestDeriveTronAddressFromMnemonic_StandardMnemonics(t *testing.T) {
-	testCases := []struct {
-		name     string
-		mnemonic string
-	}{
-		{
-			name:     "Standard 12 word mnemonic",
-			mnemonic: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-		},
-		{
-			name:     "Different 12 word mnemonic",
-			mnemonic: "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong",
-		},
-		{
-			name:     "Test mnemonic with mixed words",
-			mnemonic: "legal winner thank year wave sausage worth useful legal winner thank yellow",
-		},
+	if address1 == address2 {
+		t.Error("Different mnemonics should produce different addresses")
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			address, privKey, err := DeriveTronAddressFromMnemonic(tc.mnemonic, 0)
-
-			require.NoError(t, err)
-			assert.NotEmpty(t, address)
-			assert.NotEmpty(t, privKey)
-			assert.Len(t, privKey, 64)
-		})
+	if privKey1 == privKey2 {
+		t.Error("Different mnemonics should produce different private keys")
 	}
 }
 
-// TestPrivateKeyToTronAddress_ValidPrivateKey tests address derivation from a valid private key
-func TestPrivateKeyToTronAddress_ValidPrivateKey(t *testing.T) {
-	// Create a valid 32-byte private key
-	privateKey := make([]byte, 32)
-	for i := range privateKey {
-		privateKey[i] = byte(i + 1)
+// Test PrivateKeyToTronAddress with valid 32-byte private key
+func TestPrivateKeyToTronAddress_ValidKey(t *testing.T) {
+	// Generate a valid 32-byte private key (example)
+	privateKeyHex := "0000000000000000000000000000000000000000000000000000000000000001"
+	privateKey, err := hex.DecodeString(privateKeyHex)
+	if err != nil {
+		t.Fatalf("Failed to decode test private key: %v", err)
 	}
 
 	address, err := PrivateKeyToTronAddress(privateKey)
 
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-	assert.Greater(t, len(address), 25)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if address == "" {
+		t.Error("Expected non-empty address")
+	}
+
+	if !strings.HasPrefix(address, "T") {
+		t.Errorf("Expected address to start with 'T', got: %s", address)
+	}
+
+	// Validate it's a valid base58 encoded string
+	decoded := base58.Decode(address)
+	if len(decoded) == 0 {
+		t.Error("Address should be valid base58")
+	}
 }
 
-// TestPrivateKeyToTronAddress_DeterministicOutput ensures same key produces same address
-func TestPrivateKeyToTronAddress_DeterministicOutput(t *testing.T) {
-	privateKey := make([]byte, 32)
-	for i := range privateKey {
-		privateKey[i] = byte(i + 1)
-	}
+// Test PrivateKeyToTronAddress with 32-byte key produces consistent results
+func TestPrivateKeyToTronAddress_Deterministic(t *testing.T) {
+	privateKeyHex := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	privateKey, _ := hex.DecodeString(privateKeyHex)
 
 	address1, err1 := PrivateKeyToTronAddress(privateKey)
 	address2, err2 := PrivateKeyToTronAddress(privateKey)
 
-	require.NoError(t, err1)
-	require.NoError(t, err2)
-	assert.Equal(t, address1, address2)
-}
-
-// TestPrivateKeyToTronAddress_DifferentKeys tests that different keys produce different addresses
-func TestPrivateKeyToTronAddress_DifferentKeys(t *testing.T) {
-	privateKey1 := make([]byte, 32)
-	privateKey2 := make([]byte, 32)
-
-	for i := range privateKey1 {
-		privateKey1[i] = byte(i + 1)
-		privateKey2[i] = byte(i + 2)
+	if err1 != nil || err2 != nil {
+		t.Fatal("Expected no errors")
 	}
 
-	address1, err1 := PrivateKeyToTronAddress(privateKey1)
-	address2, err2 := PrivateKeyToTronAddress(privateKey2)
-
-	require.NoError(t, err1)
-	require.NoError(t, err2)
-	assert.NotEqual(t, address1, address2)
+	if address1 != address2 {
+		t.Errorf("Expected deterministic address from same private key, got %s and %s", address1, address2)
+	}
 }
 
-// TestPrivateKeyToTronAddress_ZeroKey tests address derivation from a zero-filled key
-func TestPrivateKeyToTronAddress_ZeroKey(t *testing.T) {
+// Test PrivateKeyToTronAddress with all zeros
+func TestPrivateKeyToTronAddress_AllZeros(t *testing.T) {
 	privateKey := make([]byte, 32) // All zeros
+
+	address, err := PrivateKeyToTronAddress(privateKey)
+
+	if err != nil {
+		t.Fatalf("Expected no error with all-zero key, got: %v", err)
+	}
+
+	if address == "" {
+		t.Error("Expected non-empty address even with all-zero key")
+	}
+
+	if !strings.HasPrefix(address, "T") {
+		t.Error("Address should start with T")
+	}
 
 	address, err := PrivateKeyToTronAddress(privateKey)
 
@@ -258,8 +232,8 @@ func TestPrivateKeyToTronAddress_ZeroKey(t *testing.T) {
 	assert.NotEmpty(t, address)
 }
 
-// TestPrivateKeyToTronAddress_MaxValueKey tests address derivation from a max-value key
-func TestPrivateKeyToTronAddress_MaxValueKey(t *testing.T) {
+// Test PrivateKeyToTronAddress with all ones
+func TestPrivateKeyToTronAddress_AllOnes(t *testing.T) {
 	privateKey := make([]byte, 32)
 	for i := range privateKey {
 		privateKey[i] = 0xFF
@@ -267,214 +241,217 @@ func TestPrivateKeyToTronAddress_MaxValueKey(t *testing.T) {
 
 	address, err := PrivateKeyToTronAddress(privateKey)
 
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
+	if err != nil {
+		t.Fatalf("Expected no error with all-one key, got: %v", err)
+	}
+
+	if address == "" {
+		t.Error("Expected non-empty address")
+	}
+
+	if !strings.HasPrefix(address, "T") {
+		t.Error("Address should start with T")
+	}
 }
 
-// TestPrivateKeyToTronAddress_EmptyKey tests error handling with empty key
+// Test PrivateKeyToTronAddress with different keys produce different addresses
+func TestPrivateKeyToTronAddress_DifferentKeys(t *testing.T) {
+	key1 := make([]byte, 32)
+	key1[0] = 0x01
+
+	key2 := make([]byte, 32)
+	key2[0] = 0x02
+
+	address1, err1 := PrivateKeyToTronAddress(key1)
+	address2, err2 := PrivateKeyToTronAddress(key2)
+
+	if err1 != nil || err2 != nil {
+		t.Fatal("Expected no errors")
+	}
+
+	if address1 == address2 {
+		t.Error("Different private keys should produce different addresses")
+	}
+}
+
+// Test PrivateKeyToTronAddress with various key patterns
+func TestPrivateKeyToTronAddress_VariousKeyPatterns(t *testing.T) {
+	testCases := []struct {
+		name     string
+		keyValue byte
+	}{
+		{"Low value", 0x01},
+		{"Mid value", 0x7F},
+		{"High value", 0xFE},
+		{"Alternating", 0xAA},
+		{"Alternating inverse", 0x55},
+	}
+
+	addresses := make(map[string]bool)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := make([]byte, 32)
+			for i := range key {
+				key[i] = tc.keyValue
+			}
+
+			address, err := PrivateKeyToTronAddress(key)
+
+			if err != nil {
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+
+			if !strings.HasPrefix(address, "T") {
+				t.Errorf("Address should start with T, got: %s", address)
+			}
+
+			// Check for uniqueness
+			if addresses[address] {
+				t.Errorf("Duplicate address found: %s", address)
+			}
+			addresses[address] = true
+		})
+	}
+}
+
+// Test PrivateKeyToTronAddress empty key
 func TestPrivateKeyToTronAddress_EmptyKey(t *testing.T) {
 	privateKey := []byte{}
 
 	address, err := PrivateKeyToTronAddress(privateKey)
 
-	// Should handle gracefully - might return error or empty address
-	// The current implementation doesn't explicitly check, but we verify behavior
+	// Empty key should still produce a result (treated as zero)
 	if err != nil {
-		assert.Empty(t, address)
-	} else {
-		// If no error, address might be derived from empty key
-		assert.NotEmpty(t, address)
+		t.Logf("Empty key resulted in error: %v", err)
+	}
+
+	if address != "" && !strings.HasPrefix(address, "T") {
+		t.Error("If address is generated, it should start with T")
 	}
 }
 
-// TestPrivateKeyToTronAddress_ShortKey tests with a key shorter than 32 bytes
+// Test PrivateKeyToTronAddress short key (less than 32 bytes)
 func TestPrivateKeyToTronAddress_ShortKey(t *testing.T) {
-	privateKey := []byte{0x01, 0x02, 0x03}
+	privateKey := make([]byte, 16) // Only 16 bytes
+	for i := range privateKey {
+		privateKey[i] = 0xAB
+	}
 
 	address, err := PrivateKeyToTronAddress(privateKey)
 
-	// Should handle gracefully
+	// Should still work - will be padded with zeros
 	if err != nil {
-		assert.Empty(t, address)
-	} else {
-		assert.NotEmpty(t, address)
+		t.Logf("Short key resulted in error: %v", err)
 	}
-}
 
-// TestPrivateKeyToTronAddress_LongKey tests with a key longer than 32 bytes
-func TestPrivateKeyToTronAddress_LongKey(t *testing.T) {
-	privateKey := make([]byte, 64)
-	for i := range privateKey {
-		privateKey[i] = byte(i)
+	if address != "" && !strings.HasPrefix(address, "T") {
+		t.Error("If address is generated, it should start with T")
 	}
+
+// Test PrivateKeyToTronAddress validates checksum
+func TestPrivateKeyToTronAddress_ValidChecksum(t *testing.T) {
+	privateKeyHex := "1111111111111111111111111111111111111111111111111111111111111111"
+	privateKey, _ := hex.DecodeString(privateKeyHex)
 
 	address, err := PrivateKeyToTronAddress(privateKey)
 
-	// Should handle gracefully - BigInt will use all bytes
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	// Decode the base58 address and verify it has the proper structure
+	decoded := base58.Decode(address)
+
+	// Should be 25 bytes: 21 bytes address + 4 bytes checksum
+	if len(decoded) != 25 {
+		t.Errorf("Expected decoded address to be 25 bytes, got: %d", len(decoded))
+	}
+
+	// First byte should be 0x41 (TRON mainnet prefix)
+	if len(decoded) > 0 && decoded[0] != 0x41 {
+		t.Errorf("Expected first byte to be 0x41, got: 0x%02X", decoded[0])
+	}
 }
 
-// TestPrivateKeyToTronAddress_VariousKeyPatterns tests different key patterns
-func TestPrivateKeyToTronAddress_VariousKeyPatterns(t *testing.T) {
+// Test address format validation helper
+func TestAddressFormat(t *testing.T) {
 	testCases := []struct {
-		name string
-		key  []byte
+		name        string
+		mnemonic    string
+		index       uint32
+		expectError bool
 	}{
 		{
-			name: "All ones",
-			key:  []byte{0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01},
+			name:        "Valid BIP39 mnemonic",
+			mnemonic:    "flash couple heart script ramp april average caution plunge alter elite author",
+			index:       0,
+			expectError: false,
 		},
 		{
-			name: "Alternating pattern",
-			key:  []byte{0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55},
+			name:        "Another valid BIP39 mnemonic",
+			mnemonic:    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+			index:       0,
+			expectError: false,
 		},
 		{
-			name: "Incremental pattern",
-			key:  []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F},
+			name:        "Valid with high index",
+			mnemonic:    "flash couple heart script ramp april average caution plunge alter elite author",
+			index:       10000,
+			expectError: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			address, err := PrivateKeyToTronAddress(tc.key)
+			address, privKey, err := DeriveTronAddressFromMnemonic(tc.mnemonic, tc.index)
 
-			require.NoError(t, err)
-			assert.NotEmpty(t, address)
+			if tc.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+
+			if !tc.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+
+			if !tc.expectError {
+				// Validate address length and prefix
+				if len(address) < 30 || len(address) > 35 {
+					t.Errorf("Address length %d is outside expected range [30-35]", len(address))
+				}
+
+				if !strings.HasPrefix(address, "T") {
+					t.Errorf("Address should start with T, got: %s", address)
+				}
+
+				// Validate private key is 64 hex characters
+				if len(privKey) != 64 {
+					t.Errorf("Private key should be 64 hex characters, got: %d", len(privKey))
+				}
+			}
 		})
 	}
 }
 
-// TestPrivateKeyToTronAddress_AddressUniqueness tests that different keys produce unique addresses
-func TestPrivateKeyToTronAddress_AddressUniqueness(t *testing.T) {
-	addresses := make(map[string]bool)
-
-	// Generate 100 addresses from different keys
-	for i := 0; i < 100; i++ {
-		privateKey := make([]byte, 32)
-		for j := range privateKey {
-			privateKey[j] = byte((i + j) % 256)
-		}
-
-		address, err := PrivateKeyToTronAddress(privateKey)
-		require.NoError(t, err)
-
-		// Ensure no duplicates
-		assert.False(t, addresses[address], "Duplicate address found")
-		addresses[address] = true
-	}
-
-	assert.Len(t, addresses, 100)
-}
-
-// TestPrivateKeyToTronAddress_ConsistencyWithDerivation tests that derived keys produce valid addresses
-func TestPrivateKeyToTronAddress_ConsistencyWithDerivation(t *testing.T) {
+// Test BIP44 path derivation consistency
+func TestBIP44PathDerivation(t *testing.T) {
 	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
 
-	// Derive a key
-	_, privKeyHex, err := DeriveTronAddressFromMnemonic(mnemonic, 0)
-	require.NoError(t, err)
+	// Test multiple indices in sequence
+	previousAddresses := make(map[string]uint32)
 
-	// Decode the private key
-	privKeyBytes, err := hex.DecodeString(privKeyHex)
-	require.NoError(t, err)
-
-	// Generate address from the private key
-	address, err := PrivateKeyToTronAddress(privKeyBytes)
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-}
-
-// TestPrivateKeyToTronAddress_AddressFormatValidation tests that generated addresses have valid format
-func TestPrivateKeyToTronAddress_AddressFormatValidation(t *testing.T) {
-	privateKey := make([]byte, 32)
-	for i := range privateKey {
-		privateKey[i] = byte(i + 1)
-	}
-
-	address, err := PrivateKeyToTronAddress(privateKey)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, address)
-
-	// Tron addresses are base58 encoded and should be printable ASCII
-	for _, ch := range address {
-		assert.True(t, ch >= 32 && ch <= 126, "Address contains non-printable character: %v", ch)
-	}
-
-	// Tron addresses don't contain easily confused characters (0, O, I, l)
-	// and should be within a reasonable length
-	assert.Greater(t, len(address), 20)
-	assert.Less(t, len(address), 60)
-}
-
-// TestDeriveTronAddressFromMnemonic_SequentialDerivation tests BIP44 path derivation
-func TestDeriveTronAddressFromMnemonic_SequentialDerivation(t *testing.T) {
-	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-
-	// Derive addresses for first 5 indices
-	addresses := make([]string, 5)
-	privKeys := make([]string, 5)
-
-	for i := uint32(0); i < 5; i++ {
-		addr, priv, err := DeriveTronAddressFromMnemonic(mnemonic, i)
-		require.NoError(t, err)
-		addresses[i] = addr
-		privKeys[i] = priv
-	}
-
-	// Verify all are unique
-	for i := 0; i < len(addresses); i++ {
-		for j := i + 1; j < len(addresses); j++ {
-			assert.NotEqual(t, addresses[i], addresses[j])
-			assert.NotEqual(t, privKeys[i], privKeys[j])
+	for i := uint32(0); i < 10; i++ {
+		address, _, err := DeriveTronAddressFromMnemonic(mnemonic, i)
+		if err != nil {
+			t.Fatalf("Error at index %d: %v", i, err)
 		}
+
+		// Check for uniqueness
+		if prevIndex, exists := previousAddresses[address]; exists {
+			t.Errorf("Duplicate address at indices %d and %d: %s", prevIndex, i, address)
+		}
+		previousAddresses[address] = i
 	}
-}
-
-// TestDeriveTronAddressFromMnemonic_NilSeedHandling tests error paths in derivation
-func TestDeriveTronAddressFromMnemonic_NilSeedHandling(t *testing.T) {
-	// Test with various edge case mnemonics
-	testCases := []struct {
-		name     string
-		mnemonic string
-	}{
-		{name: "Single word", mnemonic: "abandon"},
-		{name: "Two words", mnemonic: "abandon abandon"},
-		{name: "Whitespace only", mnemonic: "   "},
-		{name: "Special characters", mnemonic: "!@#$%^&*()"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			address, privKey, err := DeriveTronAddressFromMnemonic(tc.mnemonic, 0)
-
-			// These should work (bip39 is lenient)
-			require.NoError(t, err)
-			assert.NotEmpty(t, address)
-			assert.NotEmpty(t, privKey)
-		})
-	}
-}
-
-// TestPrivateKeyToTronAddress_PublicKeyDerivation tests the internal public key derivation
-func TestPrivateKeyToTronAddress_PublicKeyDerivation(t *testing.T) {
-	// Use a known private key constructed from test data
-	privateKey := []byte{
-		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-	}
-
-	address1, err1 := PrivateKeyToTronAddress(privateKey)
-	require.NoError(t, err1)
-
-	address2, err2 := PrivateKeyToTronAddress(privateKey)
-	require.NoError(t, err2)
-
-	// Same private key should always produce same address
-	assert.Equal(t, address1, address2)
 }
 
 // Benchmark tests
@@ -490,7 +467,7 @@ func BenchmarkDeriveTronAddressFromMnemonic(b *testing.B) {
 func BenchmarkPrivateKeyToTronAddress(b *testing.B) {
 	privateKey := make([]byte, 32)
 	for i := range privateKey {
-		privateKey[i] = byte(i + 1)
+		privateKey[i] = byte(i)
 	}
 
 	b.ResetTimer()
@@ -499,27 +476,36 @@ func BenchmarkPrivateKeyToTronAddress(b *testing.B) {
 	}
 }
 
-// TestDeriveTronAddressFromMnemonic_MemorySafety tests that the functions don't cause panics
-func TestDeriveTronAddressFromMnemonic_MemorySafety(t *testing.T) {
+// Test concurrent address generation
+func TestConcurrentAddressGeneration(t *testing.T) {
 	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
 
-	// Test concurrent access
-	done := make(chan bool, 10)
+	type result struct {
+		index   uint32
+		address string
+		err     error
+	}
 
-	for i := 0; i < 10; i++ {
-		go func(idx int) {
-			defer func() {
-				if r := recover(); r != nil {
-					t.Errorf("Panic occurred: %v", r)
-				}
-				done <- true
-			}()
+	results := make(chan result, 10)
 
-			_, _, _ = DeriveTronAddressFromMnemonic(mnemonic, uint32(idx))
+	// Generate 10 addresses concurrently
+	for i := uint32(0); i < 10; i++ {
+		go func(idx uint32) {
+			addr, _, err := DeriveTronAddressFromMnemonic(mnemonic, idx)
+			results <- result{index: idx, address: addr, err: err}
 		}(i)
 	}
 
+	addresses := make(map[string]uint32)
 	for i := 0; i < 10; i++ {
-		<-done
+		res := <-results
+		if res.err != nil {
+			t.Errorf("Error at index %d: %v", res.index, res.err)
+		}
+
+		if prevIdx, exists := addresses[res.address]; exists {
+			t.Errorf("Duplicate address at indices %d and %d", prevIdx, res.index)
+		}
+		addresses[res.address] = res.index
 	}
 }

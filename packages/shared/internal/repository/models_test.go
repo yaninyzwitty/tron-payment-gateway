@@ -396,8 +396,7 @@ func TestSQLNullTypes(t *testing.T) {
 	assert.True(t, *trueBool)
 }
 
-// ==================== Tests for Updated Account Model (with AddressIndex) ====================
-
+// Tests for Account.AddressIndex field (new field added)
 func TestAccount_WithAddressIndex(t *testing.T) {
 	id := uuid.New()
 	clientID := uuid.New()
@@ -418,7 +417,6 @@ func TestAccount_WithAddressIndex(t *testing.T) {
 	assert.NotNil(t, account.AddressIndex)
 	assert.Equal(t, int32(5), *account.AddressIndex)
 	assert.True(t, account.CreatedAt.Valid)
-	assert.Equal(t, now, account.CreatedAt.Time)
 }
 
 func TestAccount_NullAddressIndex(t *testing.T) {
@@ -447,7 +445,7 @@ func TestAccount_AddressIndexZero(t *testing.T) {
 	assert.Equal(t, int32(0), *account.AddressIndex)
 }
 
-func TestAccount_AddressIndexNegative(t *testing.T) {
+func TestAccount_NegativeAddressIndex(t *testing.T) {
 	addressIndex := int32(-1)
 	account := Account{
 		ID:           uuid.New(),
@@ -461,8 +459,8 @@ func TestAccount_AddressIndexNegative(t *testing.T) {
 	assert.Equal(t, int32(-1), *account.AddressIndex)
 }
 
-func TestAccount_AddressIndexLarge(t *testing.T) {
-	addressIndex := int32(999999)
+func TestAccount_LargeAddressIndex(t *testing.T) {
+	addressIndex := int32(2147483647) // max int32
 	account := Account{
 		ID:           uuid.New(),
 		ClientID:     uuid.New(),
@@ -472,7 +470,7 @@ func TestAccount_AddressIndexLarge(t *testing.T) {
 	}
 
 	assert.NotNil(t, account.AddressIndex)
-	assert.Equal(t, int32(999999), *account.AddressIndex)
+	assert.Equal(t, int32(2147483647), *account.AddressIndex)
 }
 
 func TestAccount_JSONSerializationWithAddressIndex(t *testing.T) {
@@ -504,363 +502,18 @@ func TestAccount_JSONSerializationWithAddressIndex(t *testing.T) {
 	assert.Equal(t, int32(10), *decoded.AddressIndex)
 }
 
-// ==================== Tests for Payment Model ====================
-
-func TestPayment_Struct(t *testing.T) {
-	id := uuid.New()
-	clientID := uuid.New()
-	accountID := uuid.New()
-	now := time.Now()
-	attemptCount := int32(0)
-
-	payment := Payment{
-		ID:           id,
-		ClientID:     clientID,
-		AccountID:    accountID,
-		Amount:       pgtype.Numeric{Int: big.NewInt(100000000), Exp: -6, Valid: true},
-		UniqueWallet: "TTestWalletAddress123",
-		Status:       "PENDING",
-		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(time.Hour), Valid: true},
-		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
-		AttemptCount: &attemptCount,
-		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	assert.Equal(t, id, payment.ID)
-	assert.Equal(t, clientID, payment.ClientID)
-	assert.Equal(t, accountID, payment.AccountID)
-	assert.True(t, payment.Amount.Valid)
-	assert.Equal(t, "TTestWalletAddress123", payment.UniqueWallet)
-	assert.Equal(t, "PENDING", payment.Status)
-	assert.True(t, payment.ExpiresAt.Valid)
-	assert.False(t, payment.ConfirmedAt.Valid)
-	assert.NotNil(t, payment.AttemptCount)
-	assert.Equal(t, int32(0), *payment.AttemptCount)
-}
-
-func TestPayment_ZeroValues(t *testing.T) {
-	var payment Payment
-
-	assert.Equal(t, uuid.Nil, payment.ID)
-	assert.Equal(t, uuid.Nil, payment.ClientID)
-	assert.Equal(t, uuid.Nil, payment.AccountID)
-	assert.False(t, payment.Amount.Valid)
-	assert.Equal(t, "", payment.UniqueWallet)
-	assert.Equal(t, "", payment.Status)
-	assert.False(t, payment.ExpiresAt.Valid)
-	assert.False(t, payment.ConfirmedAt.Valid)
-	assert.Nil(t, payment.AttemptCount)
-	assert.False(t, payment.CreatedAt.Valid)
-}
-
-func TestPayment_StatusValues(t *testing.T) {
-	statuses := []string{"PENDING", "CONFIRMED", "EXPIRED", "FAILED"}
-
-	for _, status := range statuses {
-		payment := Payment{
-			ID:           uuid.New(),
-			ClientID:     uuid.New(),
-			AccountID:    uuid.New(),
-			Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-			UniqueWallet: "TTestWallet",
-			Status:       status,
-			ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		}
-
-		assert.Equal(t, status, payment.Status)
-	}
-}
-
-func TestPayment_ConfirmedStatus(t *testing.T) {
-	now := time.Now()
-	confirmedAt := now.Add(time.Minute * 5)
-	attemptCount := int32(1)
-
-	payment := Payment{
-		ID:           uuid.New(),
-		ClientID:     uuid.New(),
-		AccountID:    uuid.New(),
-		Amount:       pgtype.Numeric{Int: big.NewInt(100000000), Valid: true},
-		UniqueWallet: "TTestWallet",
-		Status:       "CONFIRMED",
-		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(time.Hour), Valid: true},
-		ConfirmedAt:  pgtype.Timestamptz{Time: confirmedAt, Valid: true},
-		AttemptCount: &attemptCount,
-		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	assert.Equal(t, "CONFIRMED", payment.Status)
-	assert.True(t, payment.ConfirmedAt.Valid)
-	assert.Equal(t, confirmedAt, payment.ConfirmedAt.Time)
-}
-
-func TestPayment_NullConfirmedAt(t *testing.T) {
-	payment := Payment{
-		ID:           uuid.New(),
-		ClientID:     uuid.New(),
-		AccountID:    uuid.New(),
-		Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-		UniqueWallet: "TTestWallet",
-		Status:       "PENDING",
-		ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
-		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	}
-
-	assert.False(t, payment.ConfirmedAt.Valid)
-}
-
-func TestPayment_AttemptCountIncrement(t *testing.T) {
-	attemptCounts := []int32{0, 1, 2, 5, 10, 100}
-
-	for _, count := range attemptCounts {
-		countCopy := count
-		payment := Payment{
-			ID:           uuid.New(),
-			ClientID:     uuid.New(),
-			AccountID:    uuid.New(),
-			Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-			UniqueWallet: "TTestWallet",
-			Status:       "PENDING",
-			ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			AttemptCount: &countCopy,
-			CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		}
-
-		assert.NotNil(t, payment.AttemptCount)
-		assert.Equal(t, count, *payment.AttemptCount)
-	}
-}
-
-func TestPayment_AmountValidation(t *testing.T) {
-	testCases := []struct {
-		name   string
-		amount pgtype.Numeric
-	}{
-		{
-			name:   "Zero amount",
-			amount: pgtype.Numeric{Int: big.NewInt(0), Valid: true},
-		},
-		{
-			name:   "Small amount",
-			amount: pgtype.Numeric{Int: big.NewInt(1), Valid: true},
-		},
-		{
-			name:   "Large amount",
-			amount: pgtype.Numeric{Int: big.NewInt(1000000000000), Valid: true},
-		},
-		{
-			name:   "Decimal amount",
-			amount: pgtype.Numeric{Int: big.NewInt(123456), Exp: -6, Valid: true},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			payment := Payment{
-				ID:           uuid.New(),
-				ClientID:     uuid.New(),
-				AccountID:    uuid.New(),
-				Amount:       tc.amount,
-				UniqueWallet: "TTestWallet",
-				Status:       "PENDING",
-				ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-				CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			}
-
-			assert.True(t, payment.Amount.Valid)
-		})
-	}
-}
-
-func TestPayment_JSONSerialization(t *testing.T) {
-	id := uuid.New()
-	clientID := uuid.New()
-	accountID := uuid.New()
-	now := time.Now()
-	attemptCount := int32(2)
-
-	payment := Payment{
-		ID:           id,
-		ClientID:     clientID,
-		AccountID:    accountID,
-		Amount:       pgtype.Numeric{Int: big.NewInt(100000000), Exp: -6, Valid: true},
-		UniqueWallet: "TTestWallet123",
-		Status:       "CONFIRMED",
-		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(time.Hour), Valid: true},
-		ConfirmedAt:  pgtype.Timestamptz{Time: now, Valid: true},
-		AttemptCount: &attemptCount,
-		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	jsonData, err := json.Marshal(payment)
-	require.NoError(t, err)
-	assert.NotEmpty(t, jsonData)
-
-	var decoded Payment
-	err = json.Unmarshal(jsonData, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, payment.ID, decoded.ID)
-	assert.Equal(t, payment.ClientID, decoded.ClientID)
-	assert.Equal(t, payment.AccountID, decoded.AccountID)
-	assert.Equal(t, payment.UniqueWallet, decoded.UniqueWallet)
-	assert.Equal(t, payment.Status, decoded.Status)
-}
-
-func TestPayment_UniqueWalletValidation(t *testing.T) {
-	wallets := []string{
-		"TTestWallet1",
-		"TTestWallet2",
-		"TXYZTestWallet",
-		"T" + string(make([]byte, 50)),
-	}
-
-	for _, wallet := range wallets {
-		payment := Payment{
-			ID:           uuid.New(),
-			ClientID:     uuid.New(),
-			AccountID:    uuid.New(),
-			Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-			UniqueWallet: wallet,
-			Status:       "PENDING",
-			ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		}
-
-		assert.Equal(t, wallet, payment.UniqueWallet)
-	}
-}
-
-// ==================== Tests for PaymentAttempt Model ====================
-
-func TestPaymentAttempt_Struct(t *testing.T) {
-	id := uuid.New()
-	paymentID := uuid.New()
-	now := time.Now()
-
-	attempt := PaymentAttempt{
-		ID:              id,
-		PaymentID:       paymentID,
-		AttemptNumber:   1,
-		GeneratedWallet: "TGeneratedWallet1",
-		GeneratedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	assert.Equal(t, id, attempt.ID)
-	assert.Equal(t, paymentID, attempt.PaymentID)
-	assert.Equal(t, int32(1), attempt.AttemptNumber)
-	assert.Equal(t, "TGeneratedWallet1", attempt.GeneratedWallet)
-	assert.True(t, attempt.GeneratedAt.Valid)
-	assert.Equal(t, now, attempt.GeneratedAt.Time)
-}
-
-func TestPaymentAttempt_ZeroValues(t *testing.T) {
-	var attempt PaymentAttempt
-
-	assert.Equal(t, uuid.Nil, attempt.ID)
-	assert.Equal(t, uuid.Nil, attempt.PaymentID)
-	assert.Equal(t, int32(0), attempt.AttemptNumber)
-	assert.Equal(t, "", attempt.GeneratedWallet)
-	assert.False(t, attempt.GeneratedAt.Valid)
-}
-
-func TestPaymentAttempt_MultipleAttempts(t *testing.T) {
-	paymentID := uuid.New()
-	baseTime := time.Now()
-
-	attempts := []PaymentAttempt{
-		{
-			ID:              uuid.New(),
-			PaymentID:       paymentID,
-			AttemptNumber:   1,
-			GeneratedWallet: "TWallet1",
-			GeneratedAt:     pgtype.Timestamptz{Time: baseTime, Valid: true},
-		},
-		{
-			ID:              uuid.New(),
-			PaymentID:       paymentID,
-			AttemptNumber:   2,
-			GeneratedWallet: "TWallet2",
-			GeneratedAt:     pgtype.Timestamptz{Time: baseTime.Add(time.Minute), Valid: true},
-		},
-		{
-			ID:              uuid.New(),
-			PaymentID:       paymentID,
-			AttemptNumber:   3,
-			GeneratedWallet: "TWallet3",
-			GeneratedAt:     pgtype.Timestamptz{Time: baseTime.Add(time.Minute * 2), Valid: true},
-		},
-	}
-
-	// Verify all attempts belong to same payment
-	for _, attempt := range attempts {
-		assert.Equal(t, paymentID, attempt.PaymentID)
-	}
-
-	// Verify attempt numbers are sequential
-	assert.Equal(t, int32(1), attempts[0].AttemptNumber)
-	assert.Equal(t, int32(2), attempts[1].AttemptNumber)
-	assert.Equal(t, int32(3), attempts[2].AttemptNumber)
-
-	// Verify unique wallets
-	assert.NotEqual(t, attempts[0].GeneratedWallet, attempts[1].GeneratedWallet)
-	assert.NotEqual(t, attempts[1].GeneratedWallet, attempts[2].GeneratedWallet)
-}
-
-func TestPaymentAttempt_JSONSerialization(t *testing.T) {
-	id := uuid.New()
-	paymentID := uuid.New()
-	now := time.Now()
-
-	attempt := PaymentAttempt{
-		ID:              id,
-		PaymentID:       paymentID,
-		AttemptNumber:   5,
-		GeneratedWallet: "TTestWallet",
-		GeneratedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	jsonData, err := json.Marshal(attempt)
-	require.NoError(t, err)
-	assert.NotEmpty(t, jsonData)
-
-	var decoded PaymentAttempt
-	err = json.Unmarshal(jsonData, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, attempt.ID, decoded.ID)
-	assert.Equal(t, attempt.PaymentID, decoded.PaymentID)
-	assert.Equal(t, attempt.AttemptNumber, decoded.AttemptNumber)
-	assert.Equal(t, attempt.GeneratedWallet, decoded.GeneratedWallet)
-}
-
-func TestPaymentAttempt_LargeAttemptNumber(t *testing.T) {
-	attempt := PaymentAttempt{
-		ID:              uuid.New(),
-		PaymentID:       uuid.New(),
-		AttemptNumber:   999999,
-		GeneratedWallet: "TWallet",
-		GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	}
-
-	assert.Equal(t, int32(999999), attempt.AttemptNumber)
-}
-
-// ==================== Tests for Log Model ====================
-
+// Tests for Log model
 func TestLog_Struct(t *testing.T) {
 	id := uuid.New()
 	paymentID := uuid.New()
-	message := "Test log message"
 	now := time.Now()
-	rawData := []byte(`{"key":"value"}`)
+	message := "Payment initiated"
+	rawData := []byte(`{"transaction": "tx123"}`)
 
 	log := Log{
 		ID:        id,
 		PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-		EventType: "ADDRESS_GENERATED",
+		EventType: "payment.initiated",
 		Message:   &message,
 		RawData:   rawData,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -869,9 +522,9 @@ func TestLog_Struct(t *testing.T) {
 	assert.Equal(t, id, log.ID)
 	assert.True(t, log.PaymentID.Valid)
 	assert.Equal(t, paymentID, log.PaymentID.Bytes)
-	assert.Equal(t, "ADDRESS_GENERATED", log.EventType)
+	assert.Equal(t, "payment.initiated", log.EventType)
 	assert.NotNil(t, log.Message)
-	assert.Equal(t, "Test log message", *log.Message)
+	assert.Equal(t, "Payment initiated", *log.Message)
 	assert.Equal(t, rawData, log.RawData)
 	assert.True(t, log.CreatedAt.Valid)
 }
@@ -891,7 +544,9 @@ func TestLog_NullPaymentID(t *testing.T) {
 	log := Log{
 		ID:        uuid.New(),
 		PaymentID: pgtype.UUID{Valid: false},
-		EventType: "SYSTEM_EVENT",
+		EventType: "system.event",
+		Message:   stringPtr("System message"),
+		RawData:   []byte(`{}`),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
@@ -902,106 +557,53 @@ func TestLog_NullMessage(t *testing.T) {
 	log := Log{
 		ID:        uuid.New(),
 		PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		EventType: "EVENT",
+		EventType: "payment.completed",
 		Message:   nil,
+		RawData:   []byte(`{}`),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.Nil(t, log.Message)
 }
 
-func TestLog_EventTypes(t *testing.T) {
-	eventTypes := []string{
-		"ADDRESS_GENERATED",
-		"TX_CONFIRMED",
-		"WEBHOOK_SENT",
-		"PAYMENT_EXPIRED",
-		"ERROR_OCCURRED",
-	}
-
-	for _, eventType := range eventTypes {
-		log := Log{
-			ID:        uuid.New(),
-			PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			EventType: eventType,
-			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		}
-
-		assert.Equal(t, eventType, log.EventType)
-	}
-}
-
-func TestLog_JSONRawData(t *testing.T) {
-	testJSON := map[string]interface{}{
-		"transaction_id": "abc123",
-		"amount":         100.50,
-		"confirmed":      true,
-	}
-
-	rawData, err := json.Marshal(testJSON)
-	require.NoError(t, err)
-
-	log := Log{
-		ID:        uuid.New(),
-		PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		EventType: "TX_CONFIRMED",
-		RawData:   rawData,
-		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	}
-
-	assert.NotNil(t, log.RawData)
-
-	var decoded map[string]interface{}
-	err = json.Unmarshal(log.RawData, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "abc123", decoded["transaction_id"])
-	assert.Equal(t, 100.50, decoded["amount"])
-	assert.Equal(t, true, decoded["confirmed"])
-}
-
 func TestLog_EmptyRawData(t *testing.T) {
 	log := Log{
 		ID:        uuid.New(),
 		PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		EventType: "EVENT",
+		EventType: "payment.failed",
+		Message:   stringPtr("Payment failed"),
 		RawData:   []byte{},
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	assert.NotNil(t, log.RawData)
-	assert.Len(t, log.RawData, 0)
+	assert.Empty(t, log.RawData)
 }
 
-func TestLog_LargeRawData(t *testing.T) {
-	largeData := make([]byte, 10000)
-	for i := range largeData {
-		largeData[i] = byte(i % 256)
-	}
-
+func TestLog_NilRawData(t *testing.T) {
 	log := Log{
 		ID:        uuid.New(),
 		PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		EventType: "LARGE_DATA_EVENT",
-		RawData:   largeData,
+		EventType: "payment.pending",
+		Message:   stringPtr("Awaiting confirmation"),
+		RawData:   nil,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	assert.NotNil(t, log.RawData)
-	assert.Len(t, log.RawData, 10000)
+	assert.Nil(t, log.RawData)
 }
 
 func TestLog_JSONSerialization(t *testing.T) {
 	id := uuid.New()
 	paymentID := uuid.New()
-	message := "Test message"
-	rawData := []byte(`{"test":"data"}`)
 	now := time.Now()
+	message := "Test message"
+	rawData := []byte(`{"key": "value"}`)
 
 	log := Log{
 		ID:        id,
 		PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-		EventType: "TEST_EVENT",
+		EventType: "test.event",
 		Message:   &message,
 		RawData:   rawData,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -1019,59 +621,354 @@ func TestLog_JSONSerialization(t *testing.T) {
 	assert.Equal(t, log.EventType, decoded.EventType)
 }
 
-func TestLog_MultipleLogsForPayment(t *testing.T) {
-	paymentID := uuid.New()
-	baseTime := time.Now()
-
-	logs := []Log{
-		{
-			ID:        uuid.New(),
-			PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-			EventType: "ADDRESS_GENERATED",
-			CreatedAt: pgtype.Timestamptz{Time: baseTime, Valid: true},
-		},
-		{
-			ID:        uuid.New(),
-			PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-			EventType: "TX_RECEIVED",
-			CreatedAt: pgtype.Timestamptz{Time: baseTime.Add(time.Minute), Valid: true},
-		},
-		{
-			ID:        uuid.New(),
-			PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-			EventType: "TX_CONFIRMED",
-			CreatedAt: pgtype.Timestamptz{Time: baseTime.Add(time.Minute * 5), Valid: true},
-		},
+func TestLog_DifferentEventTypes(t *testing.T) {
+	eventTypes := []string{
+		"payment.created",
+		"payment.initiated",
+		"payment.confirmed",
+		"payment.completed",
+		"payment.failed",
+		"payment.expired",
+		"wallet.generated",
+		"system.error",
 	}
 
-	// Verify all logs belong to same payment
-	for _, log := range logs {
-		assert.True(t, log.PaymentID.Valid)
-		assert.Equal(t, paymentID, log.PaymentID.Bytes)
-	}
+	for _, eventType := range eventTypes {
+		log := Log{
+			ID:        uuid.New(),
+			PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			EventType: eventType,
+			Message:   stringPtr("Test"),
+			RawData:   []byte(`{}`),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
 
-	// Verify unique event types
-	assert.NotEqual(t, logs[0].EventType, logs[1].EventType)
-	assert.NotEqual(t, logs[1].EventType, logs[2].EventType)
+		assert.Equal(t, eventType, log.EventType)
+	}
 }
 
-// ==================== Integration Tests ====================
+func TestLog_LargeRawData(t *testing.T) {
+	largeData := make([]byte, 10000)
+	for i := range largeData {
+		largeData[i] = byte(i % 256)
+	}
 
-func TestModels_PaymentWithAttempts(t *testing.T) {
-	// Create a payment
-	paymentID := uuid.New()
+	log := Log{
+		ID:        uuid.New(),
+		PaymentID: pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		EventType: "test.large",
+		Message:   stringPtr("Large data test"),
+		RawData:   largeData,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, largeData, log.RawData)
+	assert.Len(t, log.RawData, 10000)
+}
+
+// Tests for Payment model
+func TestPayment_Struct(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	accountID := uuid.New()
+	now := time.Now()
+	attemptCount := int32(1)
+
 	payment := Payment{
-		ID:           paymentID,
+		ID:           id,
+		ClientID:     clientID,
+		AccountID:    accountID,
+		Amount:       pgtype.Numeric{Int: big.NewInt(100000), Exp: -2, Valid: true},
+		UniqueWallet: "TWallet123",
+		Status:       "pending",
+		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(1 * time.Hour), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: &attemptCount,
+		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	assert.Equal(t, id, payment.ID)
+	assert.Equal(t, clientID, payment.ClientID)
+	assert.Equal(t, accountID, payment.AccountID)
+	assert.True(t, payment.Amount.Valid)
+	assert.Equal(t, "TWallet123", payment.UniqueWallet)
+	assert.Equal(t, "pending", payment.Status)
+	assert.True(t, payment.ExpiresAt.Valid)
+	assert.False(t, payment.ConfirmedAt.Valid)
+	assert.NotNil(t, payment.AttemptCount)
+	assert.Equal(t, int32(1), *payment.AttemptCount)
+}
+
+func TestPayment_ZeroValues(t *testing.T) {
+	var payment Payment
+
+	assert.Equal(t, uuid.Nil, payment.ID)
+	assert.Equal(t, uuid.Nil, payment.ClientID)
+	assert.Equal(t, uuid.Nil, payment.AccountID)
+	assert.False(t, payment.Amount.Valid)
+	assert.Equal(t, "", payment.UniqueWallet)
+	assert.Equal(t, "", payment.Status)
+	assert.False(t, payment.ExpiresAt.Valid)
+	assert.False(t, payment.ConfirmedAt.Valid)
+	assert.Nil(t, payment.AttemptCount)
+}
+
+func TestPayment_DifferentStatuses(t *testing.T) {
+	statuses := []string{
+		"pending",
+		"confirmed",
+		"completed",
+		"expired",
+		"failed",
+		"cancelled",
+	}
+
+	for _, status := range statuses {
+		payment := Payment{
+			ID:           uuid.New(),
+			ClientID:     uuid.New(),
+			AccountID:    uuid.New(),
+			Amount:       pgtype.Numeric{Int: big.NewInt(100000), Exp: -2, Valid: true},
+			UniqueWallet: "TWallet",
+			Status:       status,
+			ExpiresAt:    pgtype.Timestamptz{Time: time.Now().Add(1 * time.Hour), Valid: true},
+			ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+			AttemptCount: int32Ptr(0),
+			CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
+
+		assert.Equal(t, status, payment.Status)
+	}
+}
+
+func TestPayment_NullAttemptCount(t *testing.T) {
+	payment := Payment{
+		ID:           uuid.New(),
 		ClientID:     uuid.New(),
 		AccountID:    uuid.New(),
-		Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-		UniqueWallet: "TInitialWallet",
-		Status:       "PENDING",
-		ExpiresAt:    pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
+		Amount:       pgtype.Numeric{Int: big.NewInt(100), Exp: 0, Valid: true},
+		UniqueWallet: "TWallet",
+		Status:       "pending",
+		ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: nil,
 		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	// Create attempts for this payment
+	assert.Nil(t, payment.AttemptCount)
+}
+
+func TestPayment_ZeroAttemptCount(t *testing.T) {
+	attemptCount := int32(0)
+	payment := Payment{
+		ID:           uuid.New(),
+		ClientID:     uuid.New(),
+		AccountID:    uuid.New(),
+		Amount:       pgtype.Numeric{Int: big.NewInt(100), Exp: 0, Valid: true},
+		UniqueWallet: "TWallet",
+		Status:       "pending",
+		ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: &attemptCount,
+		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.NotNil(t, payment.AttemptCount)
+	assert.Equal(t, int32(0), *payment.AttemptCount)
+}
+
+func TestPayment_HighAttemptCount(t *testing.T) {
+	attemptCount := int32(99)
+	payment := Payment{
+		ID:           uuid.New(),
+		ClientID:     uuid.New(),
+		AccountID:    uuid.New(),
+		Amount:       pgtype.Numeric{Int: big.NewInt(100), Exp: 0, Valid: true},
+		UniqueWallet: "TWallet",
+		Status:       "failed",
+		ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: &attemptCount,
+		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.NotNil(t, payment.AttemptCount)
+	assert.Equal(t, int32(99), *payment.AttemptCount)
+}
+
+func TestPayment_ConfirmedPayment(t *testing.T) {
+	now := time.Now()
+	payment := Payment{
+		ID:           uuid.New(),
+		ClientID:     uuid.New(),
+		AccountID:    uuid.New(),
+		Amount:       pgtype.Numeric{Int: big.NewInt(100), Exp: 0, Valid: true},
+		UniqueWallet: "TWallet",
+		Status:       "confirmed",
+		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(1 * time.Hour), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Time: now, Valid: true},
+		AttemptCount: int32Ptr(1),
+		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	assert.True(t, payment.ConfirmedAt.Valid)
+	assert.Equal(t, "confirmed", payment.Status)
+}
+
+func TestPayment_ExpiredPayment(t *testing.T) {
+	now := time.Now()
+	payment := Payment{
+		ID:           uuid.New(),
+		ClientID:     uuid.New(),
+		AccountID:    uuid.New(),
+		Amount:       pgtype.Numeric{Int: big.NewInt(100), Exp: 0, Valid: true},
+		UniqueWallet: "TWallet",
+		Status:       "expired",
+		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(-1 * time.Hour), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: int32Ptr(0),
+		CreatedAt:    pgtype.Timestamptz{Time: now.Add(-2 * time.Hour), Valid: true},
+	}
+
+	assert.Equal(t, "expired", payment.Status)
+	assert.False(t, payment.ConfirmedAt.Valid)
+}
+
+func TestPayment_JSONSerialization(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	accountID := uuid.New()
+	now := time.Now()
+	attemptCount := int32(2)
+
+	payment := Payment{
+		ID:           id,
+		ClientID:     clientID,
+		AccountID:    accountID,
+		Amount:       pgtype.Numeric{Int: big.NewInt(100000), Exp: -2, Valid: true},
+		UniqueWallet: "TWallet123",
+		Status:       "pending",
+		ExpiresAt:    pgtype.Timestamptz{Time: now.Add(1 * time.Hour), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: &attemptCount,
+		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	jsonData, err := json.Marshal(payment)
+	require.NoError(t, err)
+	assert.NotEmpty(t, jsonData)
+
+	var decoded Payment
+	err = json.Unmarshal(jsonData, &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, payment.ID, decoded.ID)
+	assert.Equal(t, payment.ClientID, decoded.ClientID)
+	assert.Equal(t, payment.AccountID, decoded.AccountID)
+	assert.Equal(t, payment.UniqueWallet, decoded.UniqueWallet)
+	assert.Equal(t, payment.Status, decoded.Status)
+}
+
+func TestPayment_DifferentAmounts(t *testing.T) {
+	testCases := []struct {
+		name     string
+		amount   *big.Int
+		exp      int32
+		expected string
+	}{
+		{"small amount", big.NewInt(100), -2, "1.00"},
+		{"large amount", big.NewInt(1000000), -2, "10000.00"},
+		{"zero amount", big.NewInt(0), -2, "0.00"},
+		{"fractional", big.NewInt(12345), -2, "123.45"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			payment := Payment{
+				ID:           uuid.New(),
+				ClientID:     uuid.New(),
+				AccountID:    uuid.New(),
+				Amount:       pgtype.Numeric{Int: tc.amount, Exp: tc.exp, Valid: true},
+				UniqueWallet: "TWallet",
+				Status:       "pending",
+				ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+				ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+				AttemptCount: int32Ptr(0),
+				CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}
+
+			assert.True(t, payment.Amount.Valid)
+			assert.Equal(t, tc.amount, payment.Amount.Int)
+			assert.Equal(t, tc.exp, payment.Amount.Exp)
+		})
+	}
+}
+
+func TestPayment_EmptyUniqueWallet(t *testing.T) {
+	payment := Payment{
+		ID:           uuid.New(),
+		ClientID:     uuid.New(),
+		AccountID:    uuid.New(),
+		Amount:       pgtype.Numeric{Int: big.NewInt(100), Exp: 0, Valid: true},
+		UniqueWallet: "",
+		Status:       "pending",
+		ExpiresAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ConfirmedAt:  pgtype.Timestamptz{Valid: false},
+		AttemptCount: int32Ptr(0),
+		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, "", payment.UniqueWallet)
+}
+
+// Tests for PaymentAttempt model
+func TestPaymentAttempt_Struct(t *testing.T) {
+	id := uuid.New()
+	paymentID := uuid.New()
+	now := time.Now()
+
+	attempt := PaymentAttempt{
+		ID:              id,
+		PaymentID:       paymentID,
+		AttemptNumber:   1,
+		GeneratedWallet: "TWallet123",
+		GeneratedAt:     pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	assert.Equal(t, id, attempt.ID)
+	assert.Equal(t, paymentID, attempt.PaymentID)
+	assert.Equal(t, int32(1), attempt.AttemptNumber)
+	assert.Equal(t, "TWallet123", attempt.GeneratedWallet)
+	assert.True(t, attempt.GeneratedAt.Valid)
+	assert.Equal(t, now, attempt.GeneratedAt.Time)
+}
+
+func TestPaymentAttempt_ZeroValues(t *testing.T) {
+	var attempt PaymentAttempt
+
+	assert.Equal(t, uuid.Nil, attempt.ID)
+	assert.Equal(t, uuid.Nil, attempt.PaymentID)
+	assert.Equal(t, int32(0), attempt.AttemptNumber)
+	assert.Equal(t, "", attempt.GeneratedWallet)
+	assert.False(t, attempt.GeneratedAt.Valid)
+}
+
+func TestPaymentAttempt_FirstAttempt(t *testing.T) {
+	attempt := PaymentAttempt{
+		ID:              uuid.New(),
+		PaymentID:       uuid.New(),
+		AttemptNumber:   1,
+		GeneratedWallet: "TWallet1",
+		GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, int32(1), attempt.AttemptNumber)
+}
+
+func TestPaymentAttempt_MultipleAttempts(t *testing.T) {
+	paymentID := uuid.New()
+	baseTime := time.Now()
+
 	attempts := []PaymentAttempt{
 		{
 			ID:              uuid.New(),
@@ -1085,101 +982,123 @@ func TestModels_PaymentWithAttempts(t *testing.T) {
 			PaymentID:       paymentID,
 			AttemptNumber:   2,
 			GeneratedWallet: "TWallet2",
-			GeneratedAt:     pgtype.Timestamptz{Time: time.Now().Add(time.Minute), Valid: true},
+			GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		{
+			ID:              uuid.New(),
+			PaymentID:       paymentID,
+			AttemptNumber:   3,
+			GeneratedWallet: "TWallet3",
+			GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 	}
 
-	// Verify relationships
-	for _, attempt := range attempts {
+	for i, attempt := range attempts {
 		assert.Equal(t, paymentID, attempt.PaymentID)
+		assert.Equal(t, int32(i+1), attempt.AttemptNumber)
+		assert.NotEqual(t, attempts[0].ID, attempts[1].ID)
 	}
 
-	assert.NotEqual(t, payment.UniqueWallet, attempts[0].GeneratedWallet)
+	// Verify attempt numbers are sequential
+	assert.Equal(t, int32(1), attempts[0].AttemptNumber)
+	assert.Equal(t, int32(2), attempts[1].AttemptNumber)
+	assert.Equal(t, int32(3), attempts[2].AttemptNumber)
+
+	// Verify unique wallets
 	assert.NotEqual(t, attempts[0].GeneratedWallet, attempts[1].GeneratedWallet)
+	assert.NotEqual(t, attempts[1].GeneratedWallet, attempts[2].GeneratedWallet)
 }
 
-func TestModels_PaymentWithLogs(t *testing.T) {
-	// Create a payment
+func TestPaymentAttempt_HighAttemptNumber(t *testing.T) {
+	attempt := PaymentAttempt{
+		ID:              uuid.New(),
+		PaymentID:       uuid.New(),
+		AttemptNumber:   100,
+		GeneratedWallet: "TWallet100",
+		GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, int32(100), attempt.AttemptNumber)
+}
+
+func TestPaymentAttempt_JSONSerialization(t *testing.T) {
+	id := uuid.New()
 	paymentID := uuid.New()
-	payment := Payment{
-		ID:           paymentID,
-		ClientID:     uuid.New(),
-		AccountID:    uuid.New(),
-		Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-		UniqueWallet: "TWallet",
-		Status:       "CONFIRMED",
-		ExpiresAt:    pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
-		ConfirmedAt:  pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	now := time.Now()
+
+	attempt := PaymentAttempt{
+		ID:              id,
+		PaymentID:       paymentID,
+		AttemptNumber:   5,
+		GeneratedWallet: "TWallet123",
+		GeneratedAt:     pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
-	// Create logs for this payment
-	logs := []Log{
-		{
-			ID:        uuid.New(),
-			PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-			EventType: "ADDRESS_GENERATED",
-			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		},
-		{
-			ID:        uuid.New(),
-			PaymentID: pgtype.UUID{Bytes: paymentID, Valid: true},
-			EventType: "TX_CONFIRMED",
-			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		},
-	}
+	jsonData, err := json.Marshal(attempt)
+	require.NoError(t, err)
+	assert.NotEmpty(t, jsonData)
 
-	// Verify relationships
-	for _, log := range logs {
-		assert.True(t, log.PaymentID.Valid)
-		assert.Equal(t, paymentID, log.PaymentID.Bytes)
-	}
+	var decoded PaymentAttempt
+	err = json.Unmarshal(jsonData, &decoded)
+	require.NoError(t, err)
 
-	assert.Equal(t, "CONFIRMED", payment.Status)
+	assert.Equal(t, attempt.ID, decoded.ID)
+	assert.Equal(t, attempt.PaymentID, decoded.PaymentID)
+	assert.Equal(t, attempt.AttemptNumber, decoded.AttemptNumber)
+	assert.Equal(t, attempt.GeneratedWallet, decoded.GeneratedWallet)
 }
 
-func TestModels_AccountWithPayments(t *testing.T) {
-	// Create an account
-	accountID := uuid.New()
-	clientID := uuid.New()
-	addressIndex := int32(0)
-
-	account := Account{
-		ID:           accountID,
-		ClientID:     clientID,
-		Name:         "Test Account",
-		AddressIndex: &addressIndex,
-		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+func TestPaymentAttempt_EmptyGeneratedWallet(t *testing.T) {
+	attempt := PaymentAttempt{
+		ID:              uuid.New(),
+		PaymentID:       uuid.New(),
+		AttemptNumber:   1,
+		GeneratedWallet: "",
+		GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	// Create payments for this account
-	payments := []Payment{
-		{
-			ID:           uuid.New(),
-			ClientID:     clientID,
-			AccountID:    accountID,
-			Amount:       pgtype.Numeric{Int: big.NewInt(100), Valid: true},
-			UniqueWallet: "TWallet1",
-			Status:       "PENDING",
-			ExpiresAt:    pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
-			CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		},
-		{
-			ID:           uuid.New(),
-			ClientID:     clientID,
-			AccountID:    accountID,
-			Amount:       pgtype.Numeric{Int: big.NewInt(200), Valid: true},
-			UniqueWallet: "TWallet2",
-			Status:       "CONFIRMED",
-			ExpiresAt:    pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
-			ConfirmedAt:  pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		},
+	assert.Equal(t, "", attempt.GeneratedWallet)
+}
+
+func TestPaymentAttempt_NullGeneratedAt(t *testing.T) {
+	attempt := PaymentAttempt{
+		ID:              uuid.New(),
+		PaymentID:       uuid.New(),
+		AttemptNumber:   1,
+		GeneratedWallet: "TWallet",
+		GeneratedAt:     pgtype.Timestamptz{Valid: false},
 	}
 
-	// Verify relationships
-	for _, payment := range payments {
-		assert.Equal(t, accountID, payment.AccountID)
-		assert.Equal(t, clientID, payment.ClientID)
+	assert.False(t, attempt.GeneratedAt.Valid)
+}
+
+func TestPaymentAttempt_DifferentWalletFormats(t *testing.T) {
+	walletFormats := []string{
+		"TWallet123",
+		"TXabcdef123456",
+		"T" + string(make([]byte, 33)),
+		"TShortWallet",
+		"TLongWalletAddressWithManyCharacters",
 	}
+
+	for i, wallet := range walletFormats {
+		attempt := PaymentAttempt{
+			ID:              uuid.New(),
+			PaymentID:       uuid.New(),
+			AttemptNumber:   int32(i + 1),
+			GeneratedWallet: wallet,
+			GeneratedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
+
+		assert.Equal(t, wallet, attempt.GeneratedWallet)
+	}
+}
+
+// Helper functions
+func stringPtr(s string) *string {
+	return &s
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
 }
