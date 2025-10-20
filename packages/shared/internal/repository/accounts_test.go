@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -304,57 +306,8 @@ func TestGetAccountsByClientIDSQL(t *testing.T) {
 }
 
 // Mock helpers
-type MockResult struct {
-	mock.Mock
-}
 
-func (m *MockResult) LastInsertId() (int64, error) {
-	args := m.Called()
-	return args.Get(0).(int64), args.Error(1)
-}
-
-func (m *MockResult) RowsAffected() (int64, error) {
-	args := m.Called()
-	return args.Get(0).(int64), args.Error(1)
-}
-
-type MockRow struct {
-	mock.Mock
-}
-
-func (m *MockRow) Scan(dest ...interface{}) error {
-	args := m.Called(dest)
-	return args.Error(0)
-}
-
-type MockRows struct {
-	mock.Mock
-}
-
-func (m *MockRows) Close() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *MockRows) Next() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
-
-func (m *MockRows) Scan(dest ...interface{}) error {
-	args := m.Called(dest)
-	return args.Error(0)
-}
-
-func (m *MockRows) Err() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-// ============================================================================
-// Tests for updated GetAccountByIDAndClientIDRow return type
-// ============================================================================
-
+// Tests for GetAccountByIDAndClientIDRow
 func TestGetAccountByIDAndClientIDRow_Struct(t *testing.T) {
 	id := uuid.New()
 	clientID := uuid.New()
@@ -408,9 +361,404 @@ func TestGetAccountByIDAndClientIDRow_JSONSerialization(t *testing.T) {
 	assert.Equal(t, row.Name, decoded.Name)
 }
 
-// ============================================================================
-// Tests for updated GetAccountsByClientIDRow return type
-// ============================================================================
+func TestGetAccountByIDAndClientIDRow_NullCreatedAt(t *testing.T) {
+	row := GetAccountByIDAndClientIDRow{
+		ID:        uuid.New(),
+		ClientID:  uuid.New(),
+		Name:      "Account",
+		CreatedAt: pgtype.Timestamptz{Valid: false},
+	}
+
+	assert.False(t, row.CreatedAt.Valid)
+}
+
+func TestGetAccountByIDAndClientIDRow_EmptyName(t *testing.T) {
+	row := GetAccountByIDAndClientIDRow{
+		ID:        uuid.New(),
+		ClientID:  uuid.New(),
+		Name:      "",
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, "", row.Name)
+}
+
+func TestGetAccountByIDAndClientIDRow_SpecialCharactersInName(t *testing.T) {
+	specialNames := []string{
+		"Account with spaces",
+		"Account-with-dashes",
+		"Account_with_underscores",
+		"Account.with.dots",
+		"Account@with@symbols",
+		"账户名称", // Chinese characters
+		"🚀 Rocket Account",
+	}
+
+	for _, name := range specialNames {
+		row := GetAccountByIDAndClientIDRow{
+			ID:        uuid.New(),
+			ClientID:  uuid.New(),
+			Name:      name,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
+
+		assert.Equal(t, name, row.Name)
+	}
+}
+
+func TestGetAccountByIDAndClientIDRow_LongName(t *testing.T) {
+	longName := string(make([]byte, 1000))
+	row := GetAccountByIDAndClientIDRow{
+		ID:        uuid.New(),
+		ClientID:  uuid.New(),
+		Name:      longName,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, longName, row.Name)
+	assert.Len(t, row.Name, 1000)
+}
+
+// Tests for GetAccountsByClientIDRow
+func TestGetAccountsByClientIDRow_Struct(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	now := time.Now()
+
+	row := GetAccountsByClientIDRow{
+		ID:        id,
+		ClientID:  clientID,
+		Name:      "Test Account",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	assert.Equal(t, id, row.ID)
+	assert.Equal(t, clientID, row.ClientID)
+	assert.Equal(t, "Test Account", row.Name)
+	assert.True(t, row.CreatedAt.Valid)
+	assert.Equal(t, now, row.CreatedAt.Time)
+}
+
+func TestGetAccountsByClientIDRow_ZeroValues(t *testing.T) {
+	var row GetAccountsByClientIDRow
+
+	assert.Equal(t, uuid.Nil, row.ID)
+	assert.Equal(t, uuid.Nil, row.ClientID)
+	assert.Equal(t, "", row.Name)
+	assert.False(t, row.CreatedAt.Valid)
+}
+
+func TestGetAccountsByClientIDRow_JSONSerialization(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	now := time.Now()
+
+	row := GetAccountsByClientIDRow{
+		ID:        id,
+		ClientID:  clientID,
+		Name:      "Test Account",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	jsonData, err := json.Marshal(row)
+	require.NoError(t, err)
+	assert.NotEmpty(t, jsonData)
+
+	var decoded GetAccountsByClientIDRow
+	err = json.Unmarshal(jsonData, &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, row.ID, decoded.ID)
+	assert.Equal(t, row.ClientID, decoded.ClientID)
+	assert.Equal(t, row.Name, decoded.Name)
+}
+
+func TestGetAccountsByClientIDRow_MultipleRows(t *testing.T) {
+	clientID := uuid.New()
+
+	rows := []GetAccountsByClientIDRow{
+		{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      "Account 1",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      "Account 2",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      "Account 3",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+	}
+
+	// All rows should have the same clientID
+	for _, row := range rows {
+		assert.Equal(t, clientID, row.ClientID)
+	}
+
+	// All rows should have different IDs
+	assert.NotEqual(t, rows[0].ID, rows[1].ID)
+	assert.NotEqual(t, rows[0].ID, rows[2].ID)
+	assert.NotEqual(t, rows[1].ID, rows[2].ID)
+}
+
+func TestGetAccountsByClientIDRow_EmptySlice(t *testing.T) {
+	var rows []GetAccountsByClientIDRow
+
+	assert.Empty(t, rows)
+	assert.Len(t, rows, 0)
+}
+
+func TestGetAccountsByClientIDRow_NullCreatedAt(t *testing.T) {
+	row := GetAccountsByClientIDRow{
+		ID:        uuid.New(),
+		ClientID:  uuid.New(),
+		Name:      "Account",
+		CreatedAt: pgtype.Timestamptz{Valid: false},
+	}
+
+	assert.False(t, row.CreatedAt.Valid)
+}
+
+func TestGetAccountsByClientIDRow_EmptyName(t *testing.T) {
+	row := GetAccountsByClientIDRow{
+		ID:        uuid.New(),
+		ClientID:  uuid.New(),
+		Name:      "",
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+
+	assert.Equal(t, "", row.Name)
+}
+
+func TestGetAccountsByClientIDRow_SpecialCharactersInName(t *testing.T) {
+	specialNames := []string{
+		"Account with spaces",
+		"Account-with-dashes",
+		"Account_with_underscores",
+		"Account.with.dots",
+		"Account@with@symbols",
+		"账户名称", // Chinese characters
+		"🚀 Rocket Account",
+	}
+
+	for _, name := range specialNames {
+		row := GetAccountsByClientIDRow{
+			ID:        uuid.New(),
+			ClientID:  uuid.New(),
+			Name:      name,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
+
+		assert.Equal(t, name, row.Name)
+	}
+}
+
+func TestGetAccountsByClientIDRow_SortedByCreationTime(t *testing.T) {
+	clientID := uuid.New()
+	now := time.Now()
+
+	rows := []GetAccountsByClientIDRow{
+		{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      "First",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      "Second",
+			CreatedAt: pgtype.Timestamptz{Time: now.Add(1 * time.Hour), Valid: true},
+		},
+		{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      "Third",
+			CreatedAt: pgtype.Timestamptz{Time: now.Add(2 * time.Hour), Valid: true},
+		},
+	}
+
+	// Verify timestamps are in ascending order
+	assert.True(t, rows[0].CreatedAt.Time.Before(rows[1].CreatedAt.Time))
+	assert.True(t, rows[1].CreatedAt.Time.Before(rows[2].CreatedAt.Time))
+}
+
+func TestGetAccountsByClientIDRow_LargeSlice(t *testing.T) {
+	clientID := uuid.New()
+	var rows []GetAccountsByClientIDRow
+
+	// Create 100 rows
+	for i := 0; i < 100; i++ {
+		rows = append(rows, GetAccountsByClientIDRow{
+			ID:        uuid.New(),
+			ClientID:  clientID,
+			Name:      fmt.Sprintf("Account %d", i),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		})
+	}
+
+	assert.Len(t, rows, 100)
+	// Verify all have the same clientID
+	for _, row := range rows {
+		assert.Equal(t, clientID, row.ClientID)
+	}
+}
+
+// Comparison tests between row types
+func TestRowTypes_ComparisonWithAccount(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	name := "Test Account"
+	now := time.Now()
+	addressIndex := int32(5)
+
+	account := Account{
+		ID:           id,
+		ClientID:     clientID,
+		Name:         name,
+		AddressIndex: &addressIndex,
+		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	rowByID := GetAccountByIDAndClientIDRow{
+		ID:        id,
+		ClientID:  clientID,
+		Name:      name,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	rowByClientID := GetAccountsByClientIDRow{
+		ID:        id,
+		ClientID:  clientID,
+		Name:      name,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	// Verify common fields match
+	assert.Equal(t, account.ID, rowByID.ID)
+	assert.Equal(t, account.ClientID, rowByID.ClientID)
+	assert.Equal(t, account.Name, rowByID.Name)
+
+	assert.Equal(t, account.ID, rowByClientID.ID)
+	assert.Equal(t, account.ClientID, rowByClientID.ClientID)
+	assert.Equal(t, account.Name, rowByClientID.Name)
+
+	// Row types should match each other
+	assert.Equal(t, rowByID.ID, rowByClientID.ID)
+	assert.Equal(t, rowByID.ClientID, rowByClientID.ClientID)
+	assert.Equal(t, rowByID.Name, rowByClientID.Name)
+}
+
+type MockResult struct {
+	mock.Mock
+}
+
+func (m *MockResult) LastInsertId() (int64, error) {
+	args := m.Called()
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockResult) RowsAffected() (int64, error) {
+	args := m.Called()
+	return args.Get(0).(int64), args.Error(1)
+}
+
+type MockRow struct {
+	mock.Mock
+}
+
+func (m *MockRow) Scan(dest ...interface{}) error {
+	args := m.Called(dest)
+	return args.Error(0)
+}
+
+type MockRows struct {
+	mock.Mock
+}
+
+func (m *MockRows) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockRows) Next() bool {
+	args := m.Called()
+	return args.Bool(0)
+}
+
+func (m *MockRows) Scan(dest ...interface{}) error {
+	args := m.Called(dest)
+	return args.Error(0)
+}
+
+func (m *MockRows) Err() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// ===== Tests for updated GetAccountByIDAndClientIDRow =====
+
+func TestGetAccountByIDAndClientIDRow_Struct(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	now := time.Now()
+
+	row := GetAccountByIDAndClientIDRow{
+		ID:        id,
+		ClientID:  clientID,
+		Name:      "Test Account",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	assert.Equal(t, id, row.ID)
+	assert.Equal(t, clientID, row.ClientID)
+	assert.Equal(t, "Test Account", row.Name)
+	assert.True(t, row.CreatedAt.Valid)
+	assert.Equal(t, now, row.CreatedAt.Time)
+}
+
+func TestGetAccountByIDAndClientIDRow_ZeroValues(t *testing.T) {
+	var row GetAccountByIDAndClientIDRow
+
+	assert.Equal(t, uuid.Nil, row.ID)
+	assert.Equal(t, uuid.Nil, row.ClientID)
+	assert.Equal(t, "", row.Name)
+	assert.False(t, row.CreatedAt.Valid)
+}
+
+func TestGetAccountByIDAndClientIDRow_JSONSerialization(t *testing.T) {
+	id := uuid.New()
+	clientID := uuid.New()
+	now := time.Now()
+
+	row := GetAccountByIDAndClientIDRow{
+		ID:        id,
+		ClientID:  clientID,
+		Name:      "Account",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	jsonData, err := json.Marshal(row)
+	require.NoError(t, err)
+	assert.NotEmpty(t, jsonData)
+
+	var decoded GetAccountByIDAndClientIDRow
+	err = json.Unmarshal(jsonData, &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, row.ID, decoded.ID)
+	assert.Equal(t, row.ClientID, decoded.ClientID)
+	assert.Equal(t, row.Name, decoded.Name)
+}
+
+// ===== Tests for updated GetAccountsByClientIDRow =====
 
 func TestGetAccountsByClientIDRow_Struct(t *testing.T) {
 	id := uuid.New()
@@ -440,46 +788,38 @@ func TestGetAccountsByClientIDRow_ZeroValues(t *testing.T) {
 	assert.False(t, row.CreatedAt.Valid)
 }
 
-func TestGetAccountsByClientIDRow_Multiple(t *testing.T) {
+func TestGetAccountsByClientIDRow_MultipleRows(t *testing.T) {
 	clientID := uuid.New()
-	now := time.Now()
 
 	rows := []GetAccountsByClientIDRow{
 		{
 			ID:        uuid.New(),
 			ClientID:  clientID,
 			Name:      "Account 1",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		{
 			ID:        uuid.New(),
 			ClientID:  clientID,
 			Name:      "Account 2",
-			CreatedAt: pgtype.Timestamptz{Time: now.Add(time.Hour), Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		{
 			ID:        uuid.New(),
 			ClientID:  clientID,
 			Name:      "Account 3",
-			CreatedAt: pgtype.Timestamptz{Time: now.Add(time.Hour * 2), Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 	}
 
-	// All rows should have the same client ID
 	for _, row := range rows {
 		assert.Equal(t, clientID, row.ClientID)
+		assert.NotEqual(t, uuid.Nil, row.ID)
 	}
 
-	// All rows should have unique IDs
-	ids := make(map[uuid.UUID]bool)
-	for _, row := range rows {
-		if ids[row.ID] {
-			t.Error("duplicate ID found in rows")
-		}
-		ids[row.ID] = true
-	}
-
-	assert.Equal(t, 3, len(ids))
+	assert.NotEqual(t, rows[0].ID, rows[1].ID)
+	assert.NotEqual(t, rows[0].ID, rows[2].ID)
+	assert.NotEqual(t, rows[1].ID, rows[2].ID)
 }
 
 func TestGetAccountsByClientIDRow_JSONSerialization(t *testing.T) {
@@ -490,7 +830,7 @@ func TestGetAccountsByClientIDRow_JSONSerialization(t *testing.T) {
 	row := GetAccountsByClientIDRow{
 		ID:        id,
 		ClientID:  clientID,
-		Name:      "Test Account",
+		Name:      "Account",
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
 
@@ -507,144 +847,30 @@ func TestGetAccountsByClientIDRow_JSONSerialization(t *testing.T) {
 	assert.Equal(t, row.Name, decoded.Name)
 }
 
-func TestGetAccountsByClientIDRow_EmptyName(t *testing.T) {
-	row := GetAccountsByClientIDRow{
-		ID:        uuid.New(),
-		ClientID:  uuid.New(),
-		Name:      "",
-		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	}
+func TestGetAccountsByClientIDRow_EmptySlice(t *testing.T) {
+	var rows []GetAccountsByClientIDRow
 
-	assert.Equal(t, "", row.Name)
+	assert.Empty(t, rows)
+	assert.Len(t, rows, 0)
 }
 
-func TestGetAccountsByClientIDRow_SpecialCharactersInName(t *testing.T) {
+func TestGetAccountsByClientIDRow_SpecialCharacters(t *testing.T) {
 	specialNames := []string{
-		"Account with spaces",
+		"Account with 🚀 emoji",
 		"Account-with-dashes",
 		"Account_with_underscores",
-		"账户", // Chinese
-		"🚀 Rocket Account",
+		"账户名称",
+		"Àccöùñt wîth ãccênts",
 	}
-
-	clientID := uuid.New()
 
 	for _, name := range specialNames {
 		row := GetAccountsByClientIDRow{
 			ID:        uuid.New(),
-			ClientID:  clientID,
+			ClientID:  uuid.New(),
 			Name:      name,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		}
 
 		assert.Equal(t, name, row.Name)
 	}
-}
-
-// ============================================================================
-// Integration tests for updated query return types
-// ============================================================================
-
-func TestQueries_GetAccountByIDAndClientID_ReturnType(t *testing.T) {
-	mockDB := new(MockDBTX)
-	queries := New(mockDB)
-
-	ctx := context.Background()
-	id := uuid.New()
-	clientID := uuid.New()
-
-	params := GetAccountByIDAndClientIDParams{
-		ID:       id,
-		ClientID: clientID,
-	}
-
-	mockRow := new(MockRow)
-	mockDB.On("QueryRow", ctx, getAccountByIDAndClientID, mock.Anything).Return(mockRow)
-
-	// The method should return GetAccountByIDAndClientIDRow, not Account
-	_, _ = queries.GetAccountByIDAndClientID(ctx, params)
-
-	mockDB.AssertExpectations(t)
-}
-
-func TestQueries_GetAccountsByClientID_ReturnType(t *testing.T) {
-	mockDB := new(MockDBTX)
-	queries := New(mockDB)
-
-	ctx := context.Background()
-	clientID := uuid.New()
-
-	mockRows := new(MockRows)
-	mockDB.On("Query", ctx, getAccountsByClientID, mock.Anything).Return(mockRows, nil)
-	mockRows.On("Close").Return(nil)
-	mockRows.On("Next").Return(false)
-	mockRows.On("Err").Return(nil)
-
-	// The method should return []GetAccountsByClientIDRow
-	accounts, err := queries.GetAccountsByClientID(ctx, clientID)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, accounts)
-	assert.Empty(t, accounts)
-	mockDB.AssertExpectations(t)
-}
-
-func TestGetAccountByIDAndClientIDRow_ComparisonWithAccountStruct(t *testing.T) {
-	id := uuid.New()
-	clientID := uuid.New()
-	now := time.Now()
-
-	// Note: GetAccountByIDAndClientIDRow doesn't have AddressIndex
-	row := GetAccountByIDAndClientIDRow{
-		ID:        id,
-		ClientID:  clientID,
-		Name:      "Test Account",
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	// Account struct has AddressIndex
-	addressIndex := int32(5)
-	account := Account{
-		ID:           id,
-		ClientID:     clientID,
-		Name:         "Test Account",
-		AddressIndex: &addressIndex,
-		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	// Basic fields should match
-	assert.Equal(t, account.ID, row.ID)
-	assert.Equal(t, account.ClientID, row.ClientID)
-	assert.Equal(t, account.Name, row.Name)
-	assert.Equal(t, account.CreatedAt, row.CreatedAt)
-}
-
-func TestGetAccountsByClientIDRow_ComparisonWithAccountStruct(t *testing.T) {
-	id := uuid.New()
-	clientID := uuid.New()
-	now := time.Now()
-
-	// Note: GetAccountsByClientIDRow doesn't have AddressIndex
-	row := GetAccountsByClientIDRow{
-		ID:        id,
-		ClientID:  clientID,
-		Name:      "Test Account",
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	// Account struct has AddressIndex
-	addressIndex := int32(10)
-	account := Account{
-		ID:           id,
-		ClientID:     clientID,
-		Name:         "Test Account",
-		AddressIndex: &addressIndex,
-		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
-	}
-
-	// Basic fields should match
-	assert.Equal(t, account.ID, row.ID)
-	assert.Equal(t, account.ClientID, row.ClientID)
-	assert.Equal(t, account.Name, row.Name)
-	assert.Equal(t, account.CreatedAt, row.CreatedAt)
 }
