@@ -164,7 +164,7 @@ func TestDeriveTronAddressFromMnemonic_DifferentMnemonics(t *testing.T) {
 // Test PrivateKeyToTronAddress with valid 32-byte private key
 func TestPrivateKeyToTronAddress_ValidKey(t *testing.T) {
 	// Generate a valid 32-byte private key (example)
-	privateKeyHex := "0000000000000000000000000000000000000000000000000000000000000001"
+	privateKeyHex := "3481E79956D4BD95F358AC96D151C976392FC4E3FC132F78A847906DE588C145"
 	privateKey, err := hex.DecodeString(privateKeyHex)
 	if err != nil {
 		t.Fatalf("Failed to decode test private key: %v", err)
@@ -351,7 +351,7 @@ func TestPrivateKeyToTronAddress_ShortKey(t *testing.T) {
 
 // Test PrivateKeyToTronAddress validates checksum
 func TestPrivateKeyToTronAddress_ValidChecksum(t *testing.T) {
-	privateKeyHex := "1111111111111111111111111111111111111111111111111111111111111111"
+	privateKeyHex := "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
 	privateKey, _ := hex.DecodeString(privateKeyHex)
 
 	address, err := PrivateKeyToTronAddress(privateKey)
