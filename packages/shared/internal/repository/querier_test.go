@@ -34,7 +34,7 @@ func (m *MockQuerier) GetAccountsByClientID(ctx context.Context, clientID uuid.U
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]Account), args.Error(1)
+	return args.Get(0).([]GetAccountsByClientIDRow), args.Error(1)
 }
 
 func (m *MockQuerier) GetClientByAPIKey(ctx context.Context, apiKey string) (Client, error) {
