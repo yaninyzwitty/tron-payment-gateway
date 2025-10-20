@@ -423,7 +423,7 @@ func TestAccount_NullAddressIndex(t *testing.T) {
 	account := Account{
 		ID:           uuid.New(),
 		ClientID:     uuid.New(),
-		Name:         "Account",
+		Name:         "Test Account",
 		AddressIndex: nil,
 		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
@@ -431,12 +431,12 @@ func TestAccount_NullAddressIndex(t *testing.T) {
 	assert.Nil(t, account.AddressIndex)
 }
 
-func TestAccount_ZeroAddressIndex(t *testing.T) {
+func TestAccount_AddressIndexZero(t *testing.T) {
 	addressIndex := int32(0)
 	account := Account{
 		ID:           uuid.New(),
 		ClientID:     uuid.New(),
-		Name:         "Account",
+		Name:         "Test Account",
 		AddressIndex: &addressIndex,
 		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
@@ -450,7 +450,7 @@ func TestAccount_NegativeAddressIndex(t *testing.T) {
 	account := Account{
 		ID:           uuid.New(),
 		ClientID:     uuid.New(),
-		Name:         "Account",
+		Name:         "Test Account",
 		AddressIndex: &addressIndex,
 		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
@@ -464,7 +464,7 @@ func TestAccount_LargeAddressIndex(t *testing.T) {
 	account := Account{
 		ID:           uuid.New(),
 		ClientID:     uuid.New(),
-		Name:         "Account",
+		Name:         "Test Account",
 		AddressIndex: &addressIndex,
 		CreatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
@@ -499,7 +499,7 @@ func TestAccount_JSONSerializationWithAddressIndex(t *testing.T) {
 	assert.Equal(t, account.ClientID, decoded.ClientID)
 	assert.Equal(t, account.Name, decoded.Name)
 	assert.NotNil(t, decoded.AddressIndex)
-	assert.Equal(t, *account.AddressIndex, *decoded.AddressIndex)
+	assert.Equal(t, int32(10), *decoded.AddressIndex)
 }
 
 // Tests for Log model
@@ -967,6 +967,7 @@ func TestPaymentAttempt_FirstAttempt(t *testing.T) {
 
 func TestPaymentAttempt_MultipleAttempts(t *testing.T) {
 	paymentID := uuid.New()
+	baseTime := time.Now()
 
 	attempts := []PaymentAttempt{
 		{
@@ -997,6 +998,15 @@ func TestPaymentAttempt_MultipleAttempts(t *testing.T) {
 		assert.Equal(t, int32(i+1), attempt.AttemptNumber)
 		assert.NotEqual(t, attempts[0].ID, attempts[1].ID)
 	}
+
+	// Verify attempt numbers are sequential
+	assert.Equal(t, int32(1), attempts[0].AttemptNumber)
+	assert.Equal(t, int32(2), attempts[1].AttemptNumber)
+	assert.Equal(t, int32(3), attempts[2].AttemptNumber)
+
+	// Verify unique wallets
+	assert.NotEqual(t, attempts[0].GeneratedWallet, attempts[1].GeneratedWallet)
+	assert.NotEqual(t, attempts[1].GeneratedWallet, attempts[2].GeneratedWallet)
 }
 
 func TestPaymentAttempt_HighAttemptNumber(t *testing.T) {

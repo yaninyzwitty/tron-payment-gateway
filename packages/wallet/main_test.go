@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/hex"
-	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcutil/base58"
@@ -226,6 +225,11 @@ func TestPrivateKeyToTronAddress_AllZeros(t *testing.T) {
 	if !strings.HasPrefix(address, "T") {
 		t.Error("Address should start with T")
 	}
+
+	address, err := PrivateKeyToTronAddress(privateKey)
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, address)
 }
 
 // Test PrivateKeyToTronAddress with all ones
@@ -344,7 +348,6 @@ func TestPrivateKeyToTronAddress_ShortKey(t *testing.T) {
 	if address != "" && !strings.HasPrefix(address, "T") {
 		t.Error("If address is generated, it should start with T")
 	}
-}
 
 // Test PrivateKeyToTronAddress validates checksum
 func TestPrivateKeyToTronAddress_ValidChecksum(t *testing.T) {
@@ -454,11 +457,10 @@ func TestBIP44PathDerivation(t *testing.T) {
 // Benchmark tests
 func BenchmarkDeriveTronAddressFromMnemonic(b *testing.B) {
 	mnemonic := "flash couple heart script ramp april average caution plunge alter elite author"
-	index := uint32(0)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _, _ = DeriveTronAddressFromMnemonic(mnemonic, index)
+		_, _, _ = DeriveTronAddressFromMnemonic(mnemonic, uint32(i%100))
 	}
 }
 
