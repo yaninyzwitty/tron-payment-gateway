@@ -24,12 +24,12 @@ func (m *MockQuerier) CreateClient(ctx context.Context, arg CreateClientParams) 
 	return args.Error(0)
 }
 
-func (m *MockQuerier) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (Account, error) {
+func (m *MockQuerier) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (GetAccountByIDAndClientIDRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(Account), args.Error(1)
+	return args.Get(0).(GetAccountByIDAndClientIDRow), args.Error(1)
 }
 
-func (m *MockQuerier) GetAccountsByClientID(ctx context.Context, clientID uuid.UUID) ([]Account, error) {
+func (m *MockQuerier) GetAccountsByClientID(ctx context.Context, clientID uuid.UUID) ([]GetAccountsByClientIDRow, error) {
 	args := m.Called(ctx, clientID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -100,7 +100,7 @@ func TestMockQuerier_GetAccountByIDAndClientID(t *testing.T) {
 		ClientID: clientID,
 	}
 
-	expectedAccount := Account{
+	expectedAccount := GetAccountByIDAndClientIDRow{
 		ID:       id,
 		ClientID: clientID,
 		Name:     "Test Account",
@@ -120,7 +120,7 @@ func TestMockQuerier_GetAccountsByClientID(t *testing.T) {
 	ctx := context.Background()
 	clientID := uuid.New()
 
-	expectedAccounts := []Account{
+	expectedAccounts := []GetAccountsByClientIDRow{
 		{
 			ID:       uuid.New(),
 			ClientID: clientID,
@@ -237,7 +237,7 @@ func TestMockQuerier_GetAccountsByClientID_EmptyResult(t *testing.T) {
 	ctx := context.Background()
 	clientID := uuid.New()
 
-	mockQuerier.On("GetAccountsByClientID", ctx, clientID).Return([]Account{}, nil)
+	mockQuerier.On("GetAccountsByClientID", ctx, clientID).Return([]GetAccountsByClientIDRow{}, nil)
 
 	accounts, err := mockQuerier.GetAccountsByClientID(ctx, clientID)
 
