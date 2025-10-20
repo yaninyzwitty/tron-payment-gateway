@@ -20,6 +20,8 @@ var (
 	index          = uint32(0)
 )
 
+// main derives a TRON address and its private key from the package-level mnemonicSecret and index,
+// prints the address and private key to standard output, and panics on error.
 func main() {
 	address, privKey, err := DeriveTronAddressFromMnemonic(mnemonicSecret, index)
 	if err != nil {
@@ -31,6 +33,9 @@ func main() {
 
 }
 
+// DeriveTronAddressFromMnemonic derives a TRON address and its corresponding private key hex
+// from the provided BIP39 mnemonic at the given BIP32 index using the path m/44'/195'/0'/0/index.
+// It returns the Base58-encoded TRON address, the private key as a hex string, and an error if any step fails.
 func DeriveTronAddressFromMnemonic(mnemonicSecret string, index uint32) (string, string, error) {
 	// generate seed from mnemonic
 	seed := bip39.NewSeed(mnemonicSecret, "")
@@ -66,7 +71,9 @@ func DeriveTronAddressFromMnemonic(mnemonicSecret string, index uint32) (string,
 
 }
 
-// FIXED VERSION ✅
+// PrivateKeyToTronAddress converts a 32-byte raw private key into a Base58-encoded TRON address.
+// The input privateKey is expected to be a 32-byte big-endian ECDSA private key.
+// It returns the Base58-encoded TRON address and a nil error on success.
 func PrivateKeyToTronAddress(privateKey []byte) (string, error) {
 	// Convert raw 32-byte private key into ecdsa.PrivateKey
 	d := new(big.Int).SetBytes(privateKey)
