@@ -27,10 +27,9 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) er
 }
 
 const getAccountByIDAndClientID = `-- name: GetAccountByIDAndClientID :one
-SELECT id, client_id, name, created_at
+SELECT id, client_id, name, address_index, created_at
 FROM accounts
 WHERE id = $1 AND client_id = $2
-LIMIT 1
 `
 
 type GetAccountByIDAndClientIDParams struct {
@@ -38,20 +37,14 @@ type GetAccountByIDAndClientIDParams struct {
 	ClientID uuid.UUID `db:"client_id" json:"client_id"`
 }
 
-type GetAccountByIDAndClientIDRow struct {
-	ID        uuid.UUID          `db:"id" json:"id"`
-	ClientID  uuid.UUID          `db:"client_id" json:"client_id"`
-	Name      string             `db:"name" json:"name"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-}
-
-func (q *Queries) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (GetAccountByIDAndClientIDRow, error) {
+func (q *Queries) GetAccountByIDAndClientID(ctx context.Context, arg GetAccountByIDAndClientIDParams) (Account, error) {
 	row := q.db.QueryRow(ctx, getAccountByIDAndClientID, arg.ID, arg.ClientID)
-	var i GetAccountByIDAndClientIDRow
+	var i Account
 	err := row.Scan(
 		&i.ID,
 		&i.ClientID,
 		&i.Name,
+		&i.AddressIndex,
 		&i.CreatedAt,
 	)
 	return i, err

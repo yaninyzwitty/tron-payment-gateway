@@ -10,3 +10,7 @@ CREATE TABLE logs (
     raw_data JSONB,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE INDEX idx_logs_payment_id_created_at ON logs(payment_id, created_at DESC) WHERE payment_id IS NOT NULL;
+CREATE INDEX idx_logs_event_type_created_at ON logs(event_type, created_at DESC);
+CREATE INDEX idx_logs_created_at ON logs(created_at DESC);
