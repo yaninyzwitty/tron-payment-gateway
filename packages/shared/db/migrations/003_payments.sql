@@ -8,7 +8,7 @@ CREATE TABLE payments (
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     amount DECIMAL(18,6) NOT NULL,
     unique_wallet STRING NOT NULL,
-    status STRING NOT NULL DEFAULT 'PENDING', -- PENDING / CONFIRMED / EXPIRED
+    status STRING NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'EXPIRED')),
     expires_at TIMESTAMPTZ NOT NULL,
     confirmed_at TIMESTAMPTZ,
     attempt_count INT DEFAULT 0,

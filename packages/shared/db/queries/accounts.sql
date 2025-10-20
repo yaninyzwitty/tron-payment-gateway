@@ -7,7 +7,6 @@ FROM accounts
 WHERE client_id = $1;
 
 -- name: GetAccountByIDAndClientID :one
-SELECT id, client_id, name, created_at
+SELECT id, client_id, name, address_index, created_at
 FROM accounts
-WHERE id = $1 AND client_id = $2
-LIMIT 1;
+WHERE id = $1 AND client_id = $2;
