@@ -114,7 +114,7 @@ Generated thorough and well-structured unit tests for the files changed in the f
 - ✅ Multiple status/event type scenarios
 - ✅ Large data handling
 - ✅ pgtype.Numeric handling for decimal amounts
-- ✅ pgtype.TimestampTZ handling
+- ✅ pgtype.Timestamptz handling
 - ✅ pgtype.UUID handling
 - ✅ Multiple instances and relationships
 
@@ -267,7 +267,7 @@ go test -cover ./packages/shared/internal/repository
 
 4. **Database Types:** Tests properly handle PostgreSQL-specific types through pgx/v5/pgtype (Timestamptz, Numeric, UUID).
 
-5. **Proto Files:** While proto files were changed (accounts.proto, clients.proto), the generated protobuf code (`*.pb.go`, `*_grpc.pb.go`) is typically not unit tested directly as it's generated code. Integration tests would be more appropriate for gRPC services.
+5. **Proto Files:** While proto files were changed (accounts.proto, clients.proto), the generated protobuf code (*.pb.go, *_grpc.pb.go) is typically not unit tested directly as it's generated code. Integration tests would be more appropriate for gRPC services.
 
 ## Conclusion
 
