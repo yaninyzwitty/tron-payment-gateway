@@ -395,3 +395,4 @@ func TestSQLNullTypes(t *testing.T) {
 	assert.NotNil(t, trueBool)
 	assert.True(t, *trueBool)
 }
+$ r .sed-tmp
